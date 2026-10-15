@@ -292,6 +292,25 @@ func TestAssessment(t *testing.T) {
 	}
 }
 
+func TestAssessmentWithOnlySkippedMutants(t *testing.T) {
+	log.Init(&bytes.Buffer{}, &bytes.Buffer{})
+	defer log.Reset()
+	viper.Set(configuration.UnleashThresholdEfficacyKey, float64(80))
+	viper.Set(configuration.UnleashThresholdMCoverageKey, float64(80))
+	defer viper.Reset()
+
+	data := report.Results{
+		Mutants: []mutator.Mutator{
+			stubMutant{status: mutator.Skipped, mutantType: mutator.ConditionalsNegation, position: fakePosition},
+		},
+		Elapsed: time.Minute,
+	}
+
+	if err := report.Do(data); err != nil {
+		t.Fatalf("thresholds should not fail when --diff has no applicable mutants: %v", err)
+	}
+}
+
 func TestMutantNoDiff(t *testing.T) {
 	t.Run("does not print diff even when snippets are non-empty", func(t *testing.T) {
 		out := &bytes.Buffer{}
