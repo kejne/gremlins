@@ -63,13 +63,15 @@ func loadFixture(fixture, fromPackage string) (fstest.MapFS, gomodule.GoModule, 
 		filename: {Data: src},
 	}
 
+	cleanup := func() {
+		_ = f.Close()
+	}
+
 	return mapFS, gomodule.GoModule{
-			Name:       "example.com",
-			Root:       ".",
-			CallingDir: fromPackage,
-		}, func() {
-			_ = f.Close()
-		}
+		Name:       "example.com",
+		Root:       ".",
+		CallingDir: fromPackage,
+	}, cleanup
 }
 
 func filenameFromFixture(fix string) string {

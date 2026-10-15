@@ -1,3 +1,35 @@
 [tools]
-go = "1.25"
-golangci-lint = "2"
+go = "1.26.6"
+golangci-lint = "2.14.0"
+hk = "latest"
+actionlint = "latest"
+goreleaser = "latest"
+
+[tasks.build]
+description = "Build the Gremlins binary"
+run = "mkdir -p dist/bin && go build -o dist/bin/gremlins ./cmd/gremlins"
+
+[tasks.test]
+description = "Run tests with the race detector"
+run = "go test -race ./..."
+
+[tasks.cover]
+description = "Run tests and write coverage.out"
+run = "go test -race -covermode=atomic -coverprofile=coverage.out ./..."
+
+[tasks.lint]
+description = "Lint all Go packages"
+run = "golangci-lint run ./..."
+
+[tasks.clean]
+description = "Remove generated build and coverage artifacts"
+run = "go clean && rm -rf dist coverage.out"
+
+[tasks.snapshot]
+description = "Create a clean snapshot release"
+run = "goreleaser release --snapshot --clean"
+
+[tasks.check]
+description = "Run repository checks and build the binary"
+depends = ["build"]
+run = "hk check --all"
