@@ -39,10 +39,3 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.WORKFLOW_PAT }}
-  documentation:
-    name: Build documentation
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: goreleaser
-    uses: ./.github/workflows/docs.yml
-    with:
-      version: ${{ github.ref }}
