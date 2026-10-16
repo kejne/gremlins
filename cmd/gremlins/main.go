@@ -31,6 +31,7 @@ import (
 	"github.com/kejne/gremlins/cmd"
 	"github.com/kejne/gremlins/internal/execution"
 	"github.com/kejne/gremlins/internal/log"
+	"github.com/kejne/gremlins/internal/results"
 )
 
 var version = "dev"
@@ -50,6 +51,11 @@ func main() {
 	}
 	if errors.As(err, &exitErr) {
 		exitCode = exitErr.ExitCode()
+	}
+	if errors.Is(err, results.ErrEfficacyBelowThreshold) {
+		exitCode = 10
+	} else if errors.Is(err, results.ErrCoverageBelowThreshold) {
+		exitCode = 11
 	}
 }
 

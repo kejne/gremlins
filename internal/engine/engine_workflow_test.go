@@ -29,11 +29,11 @@ import (
 	"github.com/kejne/gremlins/internal/diff"
 	"github.com/kejne/gremlins/internal/engine"
 	"github.com/kejne/gremlins/internal/engine/workerpool"
-	"github.com/kejne/gremlins/internal/execution"
 	"github.com/kejne/gremlins/internal/gomodule"
 	"github.com/kejne/gremlins/internal/log"
 	"github.com/kejne/gremlins/internal/mutator"
 	"github.com/kejne/gremlins/internal/report"
+	resultvalues "github.com/kejne/gremlins/internal/results"
 )
 
 func TestWorkflowDiscoversExecutesAndAssessesMutations(t *testing.T) {
@@ -76,17 +76,17 @@ func TestWorkflowDiscoversExecutesAndAssessesMutations(t *testing.T) {
 		t.Fatalf("workflow run failed: %v", err)
 	}
 
-	if got, want := len(results.Mutants), 2; got != want {
+	if got, want := len(results.Outcomes), 2; got != want {
 		t.Fatalf("discovered %d mutations, want %d", got, want)
 	}
 	statuses := map[mutator.Type]mutator.Status{}
-	for _, mutation := range results.Mutants {
-		statuses[mutation.Type()] = mutation.Status()
-		if mutation.Position().Filename != sourceFile {
-			t.Errorf("mutation discovered outside source file: %s", mutation.Position().Filename)
+	for _, mutation := range results.Outcomes {
+		statuses[mutation.Type] = mutation.Status
+		if mutation.Position.Filename != sourceFile {
+			t.Errorf("mutation discovered outside source file: %s", mutation.Position.Filename)
 		}
-		if mutation.Status() != mutator.Killed && mutation.Status() != mutator.Lived {
-			t.Errorf("mutation %s has outcome %s", mutation.Type(), mutation.Status())
+		if mutation.Status != mutator.Killed && mutation.Status != mutator.Lived {
+			t.Errorf("mutation %s has outcome %s", mutation.Type, mutation.Status)
 		}
 	}
 	if got := statuses[mutator.ConditionalsBoundary]; got != mutator.Killed {
@@ -97,12 +97,8 @@ func TestWorkflowDiscoversExecutesAndAssessesMutations(t *testing.T) {
 	}
 
 	err = report.Do(results, report.Settings{ThresholdEfficacy: 75})
-	var exitErr *execution.ExitError
-	if !errors.As(err, &exitErr) {
-		t.Fatalf("assessment error = %v, want efficacy-threshold ExitError", err)
-	}
-	if got, want := exitErr.ExitCode(), 10; got != want {
-		t.Errorf("assessment exit code = %d, want %d", got, want)
+	if !errors.Is(err, resultvalues.ErrEfficacyBelowThreshold) {
+		t.Fatalf("assessment error = %v, want efficacy-threshold", err)
 	}
 }
 

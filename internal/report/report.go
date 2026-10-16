@@ -21,16 +21,15 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/aymanbagabas/go-udiff"
 	"github.com/fatih/color"
 	"github.com/hako/durafmt"
 
-	"github.com/kejne/gremlins/internal/execution"
 	"github.com/kejne/gremlins/internal/log"
 	"github.com/kejne/gremlins/internal/mutator"
 	"github.com/kejne/gremlins/internal/report/internal"
+	resultvalues "github.com/kejne/gremlins/internal/results"
 )
 
 var (
@@ -41,13 +40,8 @@ var (
 	fgHiYellow = color.New(color.FgYellow).SprintFunc()
 )
 
-// Results contains the list of mutator.Mutator to be reported
-// and the time it took to discover and test them.
-type Results struct {
-	Module  string
-	Mutants []mutator.Mutator
-	Elapsed time.Duration
-}
+// Results is the value-only result of a completed run.
+type Results = resultvalues.Results
 
 // Settings contains report output and quality-gate options resolved by the CLI.
 type Settings struct {
@@ -73,13 +67,12 @@ type reportStatus struct {
 
 	mutatorStatistics internal.MutatorType
 
-	tEfficacy float64
-	mCovered  float64
-	settings  Settings
+	stats    resultvalues.Stats
+	settings Settings
 }
 
 func newReport(results Results, settings Settings) (*reportStatus, bool) {
-	if len(results.Mutants) == 0 {
+	if len(results.Outcomes) == 0 {
 		return nil, false
 	}
 	rep := &reportStatus{
@@ -88,74 +81,34 @@ func newReport(results Results, settings Settings) (*reportStatus, bool) {
 		settings: settings,
 	}
 	rep.files = make(map[string][]internal.Mutation)
-	for _, m := range results.Mutants {
-		rep.files[m.Position().Filename] = append(rep.files[m.Position().Filename], internal.Mutation{
-			Line:   m.Position().Line,
-			Column: m.Position().Column,
-			Type:   m.Type().String(),
-			Status: m.Status().String(),
+	for _, outcome := range results.Outcomes {
+		rep.files[outcome.Position.Filename] = append(rep.files[outcome.Position.Filename], internal.Mutation{
+			Line: outcome.Position.Line, Column: outcome.Position.Column,
+			Type: outcome.Type.String(), Status: outcome.Status.String(),
 		})
-
-		reportMutationStatus(m, rep)
-		reportMutatorType(m, rep)
 	}
-	if !rep.isDryRun() {
-		if rep.killed > 0 {
-			rep.tEfficacy = float64(rep.killed) / float64(rep.killed+rep.lived) * 100
-		}
-		if rep.killed+rep.lived > 0 {
-			rep.mCovered = float64(rep.killed+rep.lived) / float64(rep.killed+rep.lived+rep.notCovered) * 100
-		}
-	} else if rep.runnable > 0 {
-		rep.mCovered = float64(rep.runnable) / float64(rep.runnable+rep.notCovered) * 100
-	}
+	rep.stats, _ = resultvalues.Assess(results.Outcomes, resultvalues.Settings{DryRun: settings.DryRun})
+	rep.killed, rep.lived, rep.timedOut = rep.stats.Killed, rep.stats.Lived, rep.stats.TimedOut
+	rep.notCovered, rep.skipped = rep.stats.NotCovered, rep.stats.Skipped
+	rep.notViable, rep.runnable = rep.stats.NotViable, rep.stats.Runnable
+	rep.mutatorStatistics = toMutatorStatistics(rep.stats.MutatorCounts)
 
 	return rep, true
 }
 
-func reportMutationStatus(m mutator.Mutator, rep *reportStatus) {
-	switch m.Status() {
-	case mutator.Killed:
-		rep.killed++
-	case mutator.Lived:
-		rep.lived++
-	case mutator.NotCovered:
-		rep.notCovered++
-	case mutator.Skipped:
-		rep.skipped++
-	case mutator.TimedOut:
-		rep.timedOut++
-	case mutator.NotViable:
-		rep.notViable++
-	case mutator.Runnable:
-		rep.runnable++
-	}
-}
-
-func reportMutatorType(m mutator.Mutator, rep *reportStatus) {
-	switch m.Type() {
-	case mutator.ArithmeticBase:
-		rep.mutatorStatistics.ArithmeticBase++
-	case mutator.ConditionalsNegation:
-		rep.mutatorStatistics.ConditionalsNegation++
-	case mutator.ConditionalsBoundary:
-		rep.mutatorStatistics.ConditionalsBoundary++
-	case mutator.IncrementDecrement:
-		rep.mutatorStatistics.IncrementDecrement++
-	case mutator.InvertAssignments:
-		rep.mutatorStatistics.InvertAssignments++
-	case mutator.InvertBitwiseAssignments:
-		rep.mutatorStatistics.InvertBitwiseAssignments++
-	case mutator.InvertBitwise:
-		rep.mutatorStatistics.InvertBitwise++
-	case mutator.InvertLogical:
-		rep.mutatorStatistics.InvertLogical++
-	case mutator.InvertLoopCtrl:
-		rep.mutatorStatistics.InvertLoopCtrl++
-	case mutator.InvertNegatives:
-		rep.mutatorStatistics.InvertNegatives++
-	case mutator.RemoveSelfAssignments:
-		rep.mutatorStatistics.RemoveSelfAssignments++
+func toMutatorStatistics(counts map[mutator.Type]int) internal.MutatorType {
+	return internal.MutatorType{
+		ArithmeticBase:           counts[mutator.ArithmeticBase],
+		ConditionalsNegation:     counts[mutator.ConditionalsNegation],
+		ConditionalsBoundary:     counts[mutator.ConditionalsBoundary],
+		IncrementDecrement:       counts[mutator.IncrementDecrement],
+		InvertAssignments:        counts[mutator.InvertAssignments],
+		InvertBitwise:            counts[mutator.InvertBitwise],
+		InvertBitwiseAssignments: counts[mutator.InvertBitwiseAssignments],
+		InvertLogical:            counts[mutator.InvertLogical],
+		InvertLoopCtrl:           counts[mutator.InvertLoopCtrl],
+		InvertNegatives:          counts[mutator.InvertNegatives],
+		RemoveSelfAssignments:    counts[mutator.RemoveSelfAssignments],
 	}
 }
 
@@ -183,8 +136,8 @@ func (r *reportStatus) fileReport() {
 
 		result := internal.OutputResult{
 			GoModule:          r.module,
-			TestEfficacy:      r.tEfficacy,
-			MutationsCoverage: r.mCovered,
+			TestEfficacy:      r.stats.TestEfficacy,
+			MutationsCoverage: r.stats.MutantCoverage,
 			MutantsTotal:      r.lived + r.killed + r.notViable,
 			MutantsKilled:     r.killed,
 			MutantsLived:      r.lived,
@@ -217,7 +170,7 @@ func (r *reportStatus) dryRunReport() {
 	log.Infoln("")
 	log.Infof("Dry run completed in %s\n", r.elapsed.String())
 	log.Infof("Runnable: %s, Not covered: %s\n", runnable, notCovered)
-	log.Infof("Mutator coverage: %.2f%%\n", r.mCovered)
+	log.Infof("Mutator coverage: %.2f%%\n", r.stats.MutantCoverage)
 }
 
 func (r *reportStatus) fullRunReport() {
@@ -231,25 +184,8 @@ func (r *reportStatus) fullRunReport() {
 	log.Infof("Mutation testing completed in %s\n", r.elapsed.String())
 	log.Infof("Killed: %s, Lived: %s, Not covered: %s\n", killed, lived, notCovered)
 	log.Infof("Timed out: %s, Not viable: %s, Skipped: %s\n", timedOut, notViable, skipped)
-	log.Infof("Test efficacy: %.2f%%\n", r.tEfficacy)
-	log.Infof("Mutator coverage: %.2f%%\n", r.mCovered)
-}
-
-func (r *reportStatus) assess(tEfficacy, rCoverage float64) error {
-	if r.isDryRun() {
-		return nil
-	}
-
-	et := r.settings.ThresholdEfficacy
-	if et > 0 && r.killed+r.lived > 0 && tEfficacy <= et {
-		return execution.NewExitErr(execution.EfficacyThreshold)
-	}
-	ct := r.settings.ThresholdMutantCoverage
-	if ct > 0 && r.killed+r.lived+r.notCovered > 0 && rCoverage <= ct {
-		return execution.NewExitErr(execution.MutantCoverageThreshold)
-	}
-
-	return nil
+	log.Infof("Test efficacy: %.2f%%\n", r.stats.TestEfficacy)
+	log.Infof("Mutator coverage: %.2f%%\n", r.stats.MutantCoverage)
 }
 
 // Do generates the report of the Results received.
@@ -265,7 +201,9 @@ func Do(results Results, settings Settings) error {
 	}
 	rep.reportFindings()
 
-	return rep.assess(rep.tEfficacy, rep.mCovered)
+	_, err := resultvalues.Assess(results.Outcomes, resultvalues.Settings{DryRun: settings.DryRun, ThresholdEfficacy: settings.ThresholdEfficacy, ThresholdMutantCoverage: settings.ThresholdMutantCoverage})
+
+	return err
 }
 
 // Mutant logs a mutator.Mutator.

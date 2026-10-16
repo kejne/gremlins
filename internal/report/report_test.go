@@ -33,11 +33,11 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/kejne/gremlins/internal/configuration"
-	"github.com/kejne/gremlins/internal/execution"
 	"github.com/kejne/gremlins/internal/log"
 	"github.com/kejne/gremlins/internal/mutator"
 	"github.com/kejne/gremlins/internal/report"
 	"github.com/kejne/gremlins/internal/report/internal"
+	"github.com/kejne/gremlins/internal/results"
 )
 
 var fakePosition = newPosition("aFolder/aFile.go", 3, 12)
@@ -112,8 +112,8 @@ func TestReport(t *testing.T) {
 			defer log.Reset()
 
 			data := report.Results{
-				Mutants: tc.mutants,
-				Elapsed: (2 * time.Minute) + (22 * time.Second) + (123 * time.Millisecond),
+				Outcomes: snapshotMutants(tc.mutants),
+				Elapsed:  (2 * time.Minute) + (22 * time.Second) + (123 * time.Millisecond),
 			}
 
 			_ = report.Do(data, reportSettingsForTest())
@@ -166,8 +166,8 @@ func TestReport(t *testing.T) {
 			defer log.Reset()
 
 			data := report.Results{
-				Mutants: tc.mutants,
-				Elapsed: (2 * time.Minute) + (22 * time.Second) + (123 * time.Millisecond),
+				Outcomes: snapshotMutants(tc.mutants),
+				Elapsed:  (2 * time.Minute) + (22 * time.Second) + (123 * time.Millisecond),
 			}
 
 			_ = report.Do(data, reportSettingsForTest())
@@ -268,8 +268,8 @@ func TestAssessment(t *testing.T) {
 				stubMutant{status: mutator.NotCovered, mutantType: mutator.ConditionalsNegation, position: fakePosition},
 			}
 			data := report.Results{
-				Mutants: mutants,
-				Elapsed: 1 * time.Minute,
+				Outcomes: snapshotMutants(mutants),
+				Elapsed:  1 * time.Minute,
 			}
 
 			err := report.Do(data, reportSettingsForTest())
@@ -280,13 +280,8 @@ func TestAssessment(t *testing.T) {
 			if !tc.expectError {
 				return
 			}
-			var exitErr *execution.ExitError
-			if errors.As(err, &exitErr) {
-				if exitErr.ExitCode() == 0 {
-					t.Errorf("expected exit code to be different from 0, got %d", exitErr.ExitCode())
-				}
-			} else {
-				t.Errorf("expected err to be ExitError")
+			if !errors.Is(err, results.ErrEfficacyBelowThreshold) && !errors.Is(err, results.ErrCoverageBelowThreshold) {
+				t.Errorf("expected assessment error, got %T", err)
 			}
 		})
 	}
@@ -300,9 +295,9 @@ func TestAssessmentWithOnlySkippedMutants(t *testing.T) {
 	defer viper.Reset()
 
 	data := report.Results{
-		Mutants: []mutator.Mutator{
+		Outcomes: snapshotMutants([]mutator.Mutator{
 			stubMutant{status: mutator.Skipped, mutantType: mutator.ConditionalsNegation, position: fakePosition},
-		},
+		}),
 		Elapsed: time.Minute,
 	}
 
@@ -481,9 +476,9 @@ func TestReportToFile(t *testing.T) {
 		stubMutant{status: mutator.Killed, mutantType: mutator.RemoveSelfAssignments, position: newPosition("file3.go", 4, 100)},
 	}
 	data := report.Results{
-		Module:  "example.com/go/module",
-		Mutants: mutants,
-		Elapsed: (2 * time.Minute) + (22 * time.Second) + (123 * time.Millisecond),
+		Module:   "example.com/go/module",
+		Outcomes: snapshotMutants(mutants),
+		Elapsed:  (2 * time.Minute) + (22 * time.Second) + (123 * time.Millisecond),
 	}
 	f, _ := os.ReadFile("testdata/normal_output.json")
 	want := internal.OutputResult{}
@@ -637,4 +632,13 @@ func (s stubMutant) OrigSnippet() []byte {
 
 func (s stubMutant) MutatedSnippet() []byte {
 	return s.mutatedSnippet
+}
+
+func snapshotMutants(mutants []mutator.Mutator) []results.Outcome {
+	outcomes := make([]results.Outcome, 0, len(mutants))
+	for _, mutant := range mutants {
+		outcomes = append(outcomes, results.Snapshot(mutant))
+	}
+
+	return outcomes
 }

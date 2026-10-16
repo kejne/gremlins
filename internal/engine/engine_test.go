@@ -504,14 +504,14 @@ func TestMutations(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			got := res.Mutants
+			got := res.Outcomes
 
 			if res.Module != expectedModule {
 				t.Errorf("expected module to be %q, got %q", expectedModule, res.Module)
 			}
 
 			for _, g := range got {
-				if g.Type() == tc.mutantType && g.Status() == tc.mutStatus && g.Pos() > 0 {
+				if g.Type == tc.mutantType && g.Status == tc.mutStatus && g.Position.Offset > 0 {
 					// PASS
 					return
 				}
@@ -543,10 +543,10 @@ func TestMutantSkipDisabled(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			got := res.Mutants
+			got := res.Outcomes
 
 			for _, m := range got {
-				if m.Type() == mt {
+				if m.Type == mt {
 					t.Fatalf("expected %q not to be in the found tokens", mt)
 				}
 			}
@@ -573,11 +573,13 @@ func TestDisablingOneMutantTypeDoesNotDisableOthersForSameToken(t *testing.T) {
 	}
 
 	var hasNegation, hasBoundary bool
-	for _, m := range res.Mutants {
-		if m.Type() == mutator.ConditionalsNegation {
+	for _, m := range res.Outcomes {
+		switch m.Type {
+		case mutator.ConditionalsNegation:
 			hasNegation = true
-		} else if m.Type() == mutator.ConditionalsBoundary {
+		case mutator.ConditionalsBoundary:
 			hasBoundary = true
+		case mutator.ArithmeticBase, mutator.IncrementDecrement, mutator.InvertAssignments, mutator.InvertBitwise, mutator.InvertBitwiseAssignments, mutator.InvertLogical, mutator.InvertLoopCtrl, mutator.InvertNegatives, mutator.RemoveSelfAssignments:
 		}
 	}
 
@@ -611,7 +613,7 @@ func TestSkipTestAndNonGoFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got := res.Mutants; len(got) != 0 {
+	if got := res.Outcomes; len(got) != 0 {
 		t.Errorf("should not receive results")
 	}
 }
@@ -641,12 +643,12 @@ func TestSkipNotDiffMutants(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got := res.Mutants; len(got) == 0 {
+	if got := res.Outcomes; len(got) == 0 {
 		t.Errorf("should receive mutants")
 	}
 
-	for _, mutant := range res.Mutants {
-		if mutant.Status() != mutator.Skipped {
+	for _, mutant := range res.Outcomes {
+		if mutant.Status != mutator.Skipped {
 			t.Errorf("all mutants should be skipped")
 		}
 	}
@@ -728,8 +730,8 @@ func TestStopsOnCancelDuringDiscovery(t *testing.T) {
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("Run() error = %v, want context cancellation", err)
 	}
-	if len(res.Mutants) != 0 || len(dealer.gotMutants) != 0 {
-		t.Fatalf("cancelled discovery executed or returned mutants: results=%d executions=%d", len(res.Mutants), len(dealer.gotMutants))
+	if len(res.Outcomes) != 0 || len(dealer.gotMutants) != 0 {
+		t.Fatalf("cancelled discovery executed or returned mutants: results=%d executions=%d", len(res.Outcomes), len(dealer.gotMutants))
 	}
 }
 
@@ -758,8 +760,8 @@ func TestStopsOnCancel(t *testing.T) {
 		t.Fatalf("Run() error = %v, want context cancellation", err)
 	}
 
-	if len(res.Mutants) > 0 {
-		t.Errorf("expected to receive no mutants, got %d", len(res.Mutants))
+	if len(res.Outcomes) > 0 {
+		t.Errorf("expected to receive no mutants, got %d", len(res.Outcomes))
 	}
 }
 

@@ -33,13 +33,14 @@ components:
   logging: { in: internal/log/** }
   mutator: { in: internal/mutator/** }
   reporting: { in: internal/report }
+  results: { in: internal/results/** }
   report-internal: { in: internal/report/internal/** }
 
 deps:
   # Baseline exceptions capture current coupling before the modularity migration.
   # Tighten these package edges as their owning migration tickets land.
   cli-bin:
-    mayDependOn: [cli, execution, logging]
+    mayDependOn: [cli, execution, logging, results]
     canUse: [color]
   cli:
     anyVendorDeps: true
@@ -56,7 +57,7 @@ deps:
     mayDependOn: [configuration, logging]
     canUse: [gitdiff]
   engine:
-    mayDependOn: [configuration, coverage, diff, engine-workdir, engine-workerpool, exclusion, gomodule, logging, mutator, reporting]
+    mayDependOn: [configuration, coverage, diff, engine-workdir, engine-workerpool, exclusion, gomodule, logging, mutator, reporting, results]
   engine-workdir:
     mayDependOn: [logging]
   engine-workerpool:
@@ -74,5 +75,7 @@ deps:
   mutator:
     mayDependOn: [configuration, logging]
   reporting:
-    mayDependOn: [configuration, coverage, diff, engine, execution, exclusion, gomodule, logging, mutator, report-internal]
+    mayDependOn: [configuration, coverage, diff, engine, execution, exclusion, gomodule, logging, mutator, report-internal, results]
     canUse: [color, durafmt, udiff]
+  results:
+    mayDependOn: [mutator]

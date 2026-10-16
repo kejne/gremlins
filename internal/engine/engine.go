@@ -36,6 +36,7 @@ import (
 	"github.com/kejne/gremlins/internal/exclusion"
 	"github.com/kejne/gremlins/internal/mutator"
 	"github.com/kejne/gremlins/internal/report"
+	"github.com/kejne/gremlins/internal/results"
 
 	"github.com/kejne/gremlins/internal/gomodule"
 )
@@ -114,14 +115,14 @@ func WithDirFs(dirFS fs.FS) Option {
 // Run discovers and executes mutations, returning discovery failures to the caller.
 //
 // It checks every non-test .go file in the provided fs.FS and scans it for token mutations.
-func (mu *Engine) Run(ctx context.Context) (report.Results, error) {
+func (mu *Engine) Run(ctx context.Context) (results.Results, error) {
 	start := time.Now()
 	mutants, err := mu.discoverMutants(ctx)
 	if ctx.Err() != nil {
-		return report.Results{}, ctx.Err()
+		return results.Results{}, ctx.Err()
 	}
 	if err != nil {
-		return report.Results{}, fmt.Errorf("discover mutations: %w", err)
+		return results.Results{}, fmt.Errorf("discover mutations: %w", err)
 	}
 
 	res := mu.executeTests(ctx, mutants)
@@ -251,7 +252,7 @@ func (mu *Engine) mutationStatus(pos token.Position) mutator.Status {
 	return status
 }
 
-func (mu *Engine) executeTests(ctx context.Context, discovered []mutator.Mutator) report.Results {
+func (mu *Engine) executeTests(ctx context.Context, discovered []mutator.Mutator) results.Results {
 	pool := workerpool.Initialize("mutator", mu.poolSettings)
 	pool.Start()
 
@@ -283,7 +284,7 @@ func (mu *Engine) executeTests(ctx context.Context, discovered []mutator.Mutator
 		mutants = append(mutants, m)
 	}
 
-	return results(mutants)
+	return completedResults(mutants)
 }
 
 func checkDone(ctx context.Context) bool {
@@ -295,6 +296,11 @@ func checkDone(ctx context.Context) bool {
 	}
 }
 
-func results(m []mutator.Mutator) report.Results {
-	return report.Results{Mutants: m}
+func completedResults(m []mutator.Mutator) results.Results {
+	outcomes := make([]results.Outcome, 0, len(m))
+	for _, mutant := range m {
+		outcomes = append(outcomes, results.Snapshot(mutant))
+	}
+
+	return results.Results{Outcomes: outcomes}
 }
