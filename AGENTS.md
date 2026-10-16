@@ -20,9 +20,9 @@ Keep changes focused, preserve mutation isolation, and add regression tests for 
 
 ## Agent skills
 
-### Issue tracker
+### Issue tracking
 
-Issues are tracked in GitHub Issues via `gh`. See `docs/agents/issue-tracker.md`.
+GitHub Issues hold reports, specs, and high-level work; Beads holds implementation tickets. See `docs/agents/issue-tracker.md`. When working with implementation tickets, read `.agents/skills/beads/SKILL.md`.
 
 ### Triage labels
 
