@@ -11,9 +11,9 @@ local checks = new Mapping<String, Step> {
     ["go-lint"] = (Builtins.golangci_lint) {
         glob = "**/*.go"
     }
-    ["go-test"] {
+    ["go-test-and-coverage"] {
         glob = "**/*.go"
-        check = "go test -race ./..."
+        check = "go test -race -covermode=atomic -coverprofile=coverage.out ./... && covgate -threshold=80 coverage.out"
     }
     ["go-mod-tidy"] = (Builtins.gomod_tidy) {
         glob = List("**/*.go", "**/go.mod", "**/go.sum")

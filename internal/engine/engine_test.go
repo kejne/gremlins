@@ -18,9 +18,12 @@ package engine_test
 
 import (
 	"context"
+	"errors"
 	"go/token"
 	"io"
+	"io/fs"
 	"os"
+	"strings"
 	"testing"
 	"testing/fstest"
 
@@ -482,13 +485,6 @@ var mutationsTests = []mutationsTest{
 		covResult:  notCoveredPosition("testdata/fixtures/geq_go"),
 		mutStatus:  mutator.NotCovered,
 	},
-	{
-		name:       "it skips illegal tokens",
-		fixture:    "testdata/fixtures/illegal_go",
-		mutantType: mutator.ConditionalsBoundary,
-		token:      token.ILLEGAL,
-		covResult:  notCoveredPosition("testdata/fixtures/illegal_go"),
-	},
 }
 
 func TestMutations(t *testing.T) {
@@ -504,19 +500,14 @@ func TestMutations(t *testing.T) {
 			defer c()
 
 			mut := engine.New(mod, engine.CodeData{Cov: tc.covResult.Profile}, newJobDealerStub(t), engine.WithDirFs(mapFS))
-			res := mut.Run(context.Background())
+			res, err := mut.Run(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
 			got := res.Mutants
 
 			if res.Module != expectedModule {
 				t.Errorf("expected module to be %q, got %q", expectedModule, res.Module)
-			}
-
-			if tc.token == token.ILLEGAL {
-				if len(got) != 0 {
-					t.Errorf("expected no mutator found")
-				}
-
-				return
 			}
 
 			for _, g := range got {
@@ -548,7 +539,10 @@ func TestMutantSkipDisabled(t *testing.T) {
 			defer viperReset()
 
 			mut := engine.New(mod, testCodeData, newJobDealerStub(t), engine.WithDirFs(mapFS))
-			res := mut.Run(context.Background())
+			res, err := mut.Run(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
 			got := res.Mutants
 
 			for _, m := range got {
@@ -573,7 +567,10 @@ func TestDisablingOneMutantTypeDoesNotDisableOthersForSameToken(t *testing.T) {
 	defer viperReset()
 
 	mut := engine.New(mod, testCodeData, newJobDealerStub(t), engine.WithDirFs(mapFS))
-	res := mut.Run(context.Background())
+	res, err := mut.Run(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	var hasNegation, hasBoundary bool
 	for _, m := range res.Mutants {
@@ -609,7 +606,10 @@ func TestSkipTestAndNonGoFiles(t *testing.T) {
 	viperSet(map[string]any{configuration.UnleashDryRunKey: true})
 	defer viperReset()
 	mut := engine.New(mod, engine.CodeData{}, newJobDealerStub(t), engine.WithDirFs(sys))
-	res := mut.Run(context.Background())
+	res, err := mut.Run(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if got := res.Mutants; len(got) != 0 {
 		t.Errorf("should not receive results")
@@ -636,7 +636,10 @@ func TestSkipNotDiffMutants(t *testing.T) {
 		"file.go": nil,
 	}}
 	mut := engine.New(mod, codeData, newJobDealerStub(t), engine.WithDirFs(sys))
-	res := mut.Run(context.Background())
+	res, err := mut.Run(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if got := res.Mutants; len(got) == 0 {
 		t.Errorf("should receive mutants")
@@ -649,6 +652,99 @@ func TestSkipNotDiffMutants(t *testing.T) {
 	}
 }
 
+func TestDiscoveryErrorsFailBeforeExecution(t *testing.T) {
+	tests := []struct {
+		name string
+		fs   fs.FS
+		want string
+	}{
+		{
+			name: "walk error",
+			fs:   failingFS{err: errors.New("walk failed")},
+			want: `walk ".": walk failed`,
+		},
+		{
+			name: "read error",
+			fs: failingReadFS{
+				MapFS: fstest.MapFS{"file.go": {Data: []byte("package p")}},
+				err:   errors.New("read failed"),
+			},
+			want: `read "file.go": read failed`,
+		},
+		{
+			name: "parse error",
+			fs: fstest.MapFS{
+				"file.go": {Data: []byte("package p\nfunc {")},
+			},
+			want: `parse "file.go"`,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			mod := gomodule.GoModule{Name: expectedModule, Root: ".", CallingDir: "."}
+			dealer := newJobDealerStub(t)
+			mut := engine.New(mod, engine.CodeData{}, dealer, engine.WithDirFs(tc.fs))
+
+			_, err := mut.Run(context.Background())
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("Run() error = %v, want substring %q", err, tc.want)
+			}
+			if len(dealer.gotMutants) != 0 {
+				t.Fatalf("executed %d mutants after discovery failed", len(dealer.gotMutants))
+			}
+		})
+	}
+}
+
+type failingFS struct{ err error }
+
+func (f failingFS) Open(string) (fs.File, error) { return nil, f.err }
+
+type failingReadFS struct {
+	fstest.MapFS
+	err error
+}
+
+func (f failingReadFS) ReadFile(name string) ([]byte, error) {
+	if name == "file.go" {
+		return nil, f.err
+	}
+
+	return fs.ReadFile(f.MapFS, name)
+}
+
+func TestStopsOnCancelDuringDiscovery(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	mapFS := cancelOnReadDirFS{
+		MapFS:  fstest.MapFS{"file.go": {Data: []byte("package p")}},
+		cancel: cancel,
+	}
+	mod := gomodule.GoModule{Name: expectedModule, Root: ".", CallingDir: "."}
+	dealer := newJobDealerStub(t)
+	mut := engine.New(mod, engine.CodeData{}, dealer, engine.WithDirFs(mapFS))
+
+	res, err := mut.Run(ctx)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("Run() error = %v, want context cancellation", err)
+	}
+	if len(res.Mutants) != 0 || len(dealer.gotMutants) != 0 {
+		t.Fatalf("cancelled discovery executed or returned mutants: results=%d executions=%d", len(res.Mutants), len(dealer.gotMutants))
+	}
+}
+
+type cancelOnReadDirFS struct {
+	fstest.MapFS
+	cancel context.CancelFunc
+}
+
+func (f cancelOnReadDirFS) ReadDir(name string) ([]fs.DirEntry, error) {
+	entries, err := f.MapFS.ReadDir(name)
+	f.cancel()
+
+	return entries, err
+}
+
 func TestStopsOnCancel(t *testing.T) {
 	mapFS, mod, c := loadFixture(defaultFixture, ".")
 	defer c()
@@ -657,7 +753,10 @@ func TestStopsOnCancel(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	res := mut.Run(ctx)
+	res, err := mut.Run(ctx)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("Run() error = %v, want context cancellation", err)
+	}
 
 	if len(res.Mutants) > 0 {
 		t.Errorf("expected to receive no mutants, got %d", len(res.Mutants))
@@ -698,7 +797,9 @@ func TestPackageDiscovery(t *testing.T) {
 			jds := newJobDealerStub(t)
 			mut := engine.New(mod, testCodeData, jds, engine.WithDirFs(mapFS))
 
-			_ = mut.Run(context.Background())
+			if _, err := mut.Run(context.Background()); err != nil {
+				t.Fatal(err)
+			}
 
 			got := jds.gotMutants[0].Pkg()
 

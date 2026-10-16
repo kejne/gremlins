@@ -46,12 +46,11 @@ import (
 // It traverses the AST of the project, finds which TokenMutator can be applied and
 // performs the actual mutation testing.
 type Engine struct {
-	fs           fs.FS
-	jDealer      ExecutorDealer
-	codeData     CodeData
-	mutantStream chan mutator.Mutator
-	module       gomodule.GoModule
-	logger       report.MutantLogger
+	fs       fs.FS
+	jDealer  ExecutorDealer
+	codeData CodeData
+	module   gomodule.GoModule
+	logger   report.MutantLogger
 }
 
 // CodeData is used to check if the mutant should be executed.
@@ -93,57 +92,89 @@ func WithDirFs(dirFS fs.FS) Option {
 	}
 }
 
-// Run executes the mutation testing.
+// Run discovers and executes mutations, returning discovery failures to the caller.
 //
-// It walks the fs.FS provided and checks every .go file which is not a test.
-// For each file it will scan for tokenMutations and gather all the mutants found.
-func (mu *Engine) Run(ctx context.Context) report.Results {
-	mu.mutantStream = make(chan mutator.Mutator)
-	go func() {
-		defer close(mu.mutantStream)
-		_ = fs.WalkDir(mu.fs, ".", func(path string, _ fs.DirEntry, _ error) error {
-			isGoCode := filepath.Ext(path) == ".go" && !strings.HasSuffix(path, "_test.go")
-
-			if isGoCode && !mu.codeData.Exclusion.IsFileExcluded(path) {
-				mu.runOnFile(path)
-			}
-
-			return nil
-		})
-	}()
-
+// It checks every non-test .go file in the provided fs.FS and scans it for token mutations.
+func (mu *Engine) Run(ctx context.Context) (report.Results, error) {
 	start := time.Now()
-	res := mu.executeTests(ctx)
+	mutants, err := mu.discoverMutants(ctx)
+	if ctx.Err() != nil {
+		return report.Results{}, ctx.Err()
+	}
+	if err != nil {
+		return report.Results{}, fmt.Errorf("discover mutations: %w", err)
+	}
+
+	res := mu.executeTests(ctx, mutants)
 	res.Elapsed = time.Since(start)
 	res.Module = mu.module.Name
 
-	return res
+	return res, nil
 }
 
-func (mu *Engine) runOnFile(fileName string) {
-	src, _ := mu.fs.Open(fileName)
-	set := token.NewFileSet()
-	file, _ := parser.ParseFile(set, fileName, src, parser.ParseComments)
-	_ = src.Close()
+func (mu *Engine) discoverMutants(ctx context.Context) ([]mutator.Mutator, error) {
+	var mutants []mutator.Mutator
+	err := fs.WalkDir(mu.fs, ".", func(path string, _ fs.DirEntry, walkErr error) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if walkErr != nil {
+			return fmt.Errorf("walk %q: %w", path, walkErr)
+		}
 
+		isGoCode := filepath.Ext(path) == ".go" && !strings.HasSuffix(path, "_test.go")
+		if !isGoCode || mu.codeData.Exclusion.IsFileExcluded(path) {
+			return nil
+		}
+
+		found, err := mu.runOnFile(path)
+		if err != nil {
+			return err
+		}
+		mutants = append(mutants, found...)
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return mutants, nil
+}
+
+func (mu *Engine) runOnFile(fileName string) ([]mutator.Mutator, error) {
+	src, err := fs.ReadFile(mu.fs, fileName)
+	if err != nil {
+		return nil, fmt.Errorf("read %q: %w", fileName, err)
+	}
+	set := token.NewFileSet()
+	file, err := parser.ParseFile(set, fileName, src, parser.ParseComments)
+	if err != nil {
+		return nil, fmt.Errorf("parse %q: %w", fileName, err)
+	}
+
+	var mutants []mutator.Mutator
 	ast.Inspect(file, func(node ast.Node) bool {
 		n, ok := NewTokenNode(node)
 		if !ok {
 			return true
 		}
-		mu.findMutations(fileName, set, file, n)
+		mutants = append(mutants, mu.findMutations(fileName, set, file, n)...)
 
 		return true
 	})
+
+	return mutants, nil
 }
 
-func (mu *Engine) findMutations(fileName string, set *token.FileSet, file *ast.File, node *NodeToken) {
+func (mu *Engine) findMutations(fileName string, set *token.FileSet, file *ast.File, node *NodeToken) []mutator.Mutator {
 	mutantTypes, ok := TokenMutantType[node.Tok()]
 	if !ok {
-		return
+		return nil
 	}
 
 	pkg := mu.pkgName(fileName, file.Name.Name)
+	var mutants []mutator.Mutator
 	for _, mt := range mutantTypes {
 		if !configuration.Get[bool](configuration.MutantTypeEnabledKey(mt)) {
 			continue
@@ -153,8 +184,10 @@ func (mu *Engine) findMutations(fileName string, set *token.FileSet, file *ast.F
 		tm.SetType(mutantType)
 		tm.SetStatus(mu.mutationStatus(set.Position(node.TokPos)))
 
-		mu.mutantStream <- tm
+		mutants = append(mutants, tm)
 	}
+
+	return mutants
 }
 
 func (mu *Engine) pkgName(fileName, fPkg string) string {
@@ -199,7 +232,7 @@ func (mu *Engine) mutationStatus(pos token.Position) mutator.Status {
 	return status
 }
 
-func (mu *Engine) executeTests(ctx context.Context) report.Results {
+func (mu *Engine) executeTests(ctx context.Context, discovered []mutator.Mutator) report.Results {
 	pool := workerpool.Initialize("mutator")
 	pool.Start()
 
@@ -209,7 +242,7 @@ func (mu *Engine) executeTests(ctx context.Context) report.Results {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for mut := range mu.mutantStream {
+		for _, mut := range discovered {
 			ok := checkDone(ctx)
 			if !ok {
 				pool.Stop()

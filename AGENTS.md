@@ -4,15 +4,7 @@ Gremlins is a Go mutation-testing tool. The engine finds AST-level mutations, ex
 
 ## Tooling and checks
 
-Use mise for project tools and tasks, and hk for local quality checks:
-
-```sh
-mise install
-hk check --all
-mise run check
-```
-
-`hk check --all` runs formatting, vet, lint, race-enabled tests, module-tidy validation, and workflow linting. Run focused Go tests while iterating, then the full check before handoff. Build and release tasks are available through `mise run build` and `mise run snapshot`.
+Use `hk check` by default; run `hk check --all` before handoff. Install tools with `mise install`. For other project tasks, run `mise tasks ls`.
 
 ## Architecture
 

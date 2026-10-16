@@ -18,6 +18,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -129,11 +130,11 @@ func runUnleash(ctx context.Context) func(cmd *cobra.Command, args []string) err
 			cancelled = true
 		})
 		wg.Wait()
+		if cancelled || errors.Is(err, context.Canceled) {
+			return nil
+		}
 		if err != nil {
 			return err
-		}
-		if cancelled {
-			return nil
 		}
 
 		return report.Do(results)
@@ -188,7 +189,10 @@ func run(ctx context.Context, mod gomodule.GoModule, workDir string) (report.Res
 	}
 
 	mut := engine.New(mod, codeData, jDealer)
-	results := mut.Run(ctx)
+	results, err := mut.Run(ctx)
+	if err != nil {
+		return report.Results{}, err
+	}
 
 	return results, nil
 }

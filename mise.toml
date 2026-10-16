@@ -3,7 +3,9 @@ go = "1.26.6"
 golangci-lint = "2.14.0"
 hk = "latest"
 actionlint = "latest"
+shellcheck = "0.11.0"
 goreleaser = "latest"
+"go:codeberg.org/kejne/covgate" = "v0.1.0"
 
 [tasks.build]
 description = "Build the Gremlins binary"
