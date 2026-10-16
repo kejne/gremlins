@@ -14,7 +14,7 @@
  *    limitations under the License.
  */
 
-package engine_test
+package mutation_test
 
 import (
 	"go/ast"
@@ -26,7 +26,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/kejne/gremlins/internal/engine"
+	"github.com/kejne/gremlins/internal/mutation"
 	"github.com/kejne/gremlins/internal/mutator"
 )
 
@@ -36,10 +36,10 @@ func TestTokenMutator_Apply_SetsSnippets(t *testing.T) {
 	src := "package main\n\nfunc main() {\n\ta := 1 + 2\n}\n"
 
 	testCases := map[string]struct {
-		assertFunc func(t *testing.T, mut *engine.TokenMutator, err error)
+		assertFunc func(t *testing.T, mut *mutation.TokenMutator, err error)
 	}{
 		"should_set_orig_snippet_when_apply_is_called": {
-			assertFunc: func(t *testing.T, mut *engine.TokenMutator, err error) {
+			assertFunc: func(t *testing.T, mut *mutation.TokenMutator, err error) {
 				t.Helper()
 				if err != nil {
 					t.Fatal(err)
@@ -51,7 +51,7 @@ func TestTokenMutator_Apply_SetsSnippets(t *testing.T) {
 			},
 		},
 		"should_set_mutated_snippet_when_apply_is_called": {
-			assertFunc: func(t *testing.T, mut *engine.TokenMutator, err error) {
+			assertFunc: func(t *testing.T, mut *mutation.TokenMutator, err error) {
 				t.Helper()
 				if err != nil {
 					t.Fatal(err)
@@ -95,12 +95,12 @@ func TestTokenMutator_Apply_SetsSnippets(t *testing.T) {
 				t.Fatal("binary expression node must be found")
 			}
 
-			n, ok := engine.NewTokenNode(node)
+			n, ok := mutation.NewTokenNode(node)
 			if !ok {
 				t.Fatal("token node must be created")
 			}
 
-			mut := engine.NewTokenMutant("example.com/test", set, f, n)
+			mut := mutation.NewTokenMutant("example.com/test", set, f, n)
 			mut.SetType(mutator.ArithmeticBase)
 			mut.SetStatus(mutator.Runnable)
 			mut.SetWorkdir(workdir)
@@ -143,11 +143,11 @@ func TestMutantApplyAndRollback(t *testing.T) {
 	})
 
 	for i, node := range nodes {
-		n, ok := engine.NewTokenNode(node)
+		n, ok := mutation.NewTokenNode(node)
 		if !ok {
 			t.Fatal("new actualToken node should be created")
 		}
-		mut := engine.NewTokenMutant("example.com/test", set, f, n)
+		mut := mutation.NewTokenMutant("example.com/test", set, f, n)
 		mut.SetType(mutator.ArithmeticBase)
 		mut.SetStatus(mutator.Runnable)
 		mut.SetWorkdir(workdir)

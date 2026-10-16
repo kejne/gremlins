@@ -32,6 +32,7 @@ components:
   gomodule: { in: internal/gomodule/** }
   logging: { in: internal/log/** }
   mutator: { in: internal/mutator/** }
+  mutation: { in: internal/mutation/** }
   reporting: { in: internal/report }
   results: { in: internal/results/** }
   report-internal: { in: internal/report/internal/** }
@@ -57,7 +58,7 @@ deps:
     mayDependOn: [configuration, logging]
     canUse: [gitdiff]
   engine:
-    mayDependOn: [configuration, coverage, diff, exclusion, execution, gomodule, mutator, reporting, results]
+    mayDependOn: [configuration, coverage, diff, exclusion, execution, gomodule, mutation, mutator, reporting, results]
   exclusion:
     mayDependOn: [configuration]
     canUse: [viper]
@@ -70,6 +71,8 @@ deps:
   logging:
     mayDependOn: [configuration]
     canUse: [color]
+  mutation:
+    mayDependOn: [coverage, diff, exclusion, gomodule, mutator]
   mutator:
     mayDependOn: [configuration, logging]
   reporting:

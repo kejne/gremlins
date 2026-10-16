@@ -14,7 +14,7 @@
  *    limitations under the License.
  */
 
-package engine
+package mutation
 
 import (
 	"bytes"
@@ -63,7 +63,7 @@ func NewTokenMutant(pkg string, set *token.FileSet, file *ast.File, node *NodeTo
 	}
 }
 
-// Type returns the mutator.Type of the mutant.Mutator.
+// Type returns the mutation type.
 func (m *TokenMutator) Type() mutator.Type {
 	return m.mutantType
 }
@@ -73,7 +73,7 @@ func (m *TokenMutator) SetType(mt mutator.Type) {
 	m.mutantType = mt
 }
 
-// Status returns the mutator.Status of the mutant.Mutator.
+// Status returns the current mutation outcome status.
 func (m *TokenMutator) Status() mutator.Status {
 	return m.status
 }
@@ -203,7 +203,7 @@ func (m *TokenMutator) SetWorkdir(path string) {
 	m.workDir = path
 }
 
-// Workdir returns the current working dir in which the Mutator will apply its mutations.
+// Workdir returns the current working dir in which the mutator.Mutator will apply its mutations.
 func (m *TokenMutator) Workdir() string {
 	return m.workDir
 }

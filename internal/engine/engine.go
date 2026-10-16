@@ -20,19 +20,16 @@ package engine
 import (
 	"context"
 	"fmt"
-	"go/ast"
-	"go/parser"
-	"go/token"
 	"io/fs"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/kejne/gremlins/internal/coverage"
 	"github.com/kejne/gremlins/internal/diff"
 	"github.com/kejne/gremlins/internal/exclusion"
 	"github.com/kejne/gremlins/internal/execution"
+	"github.com/kejne/gremlins/internal/mutation"
 	"github.com/kejne/gremlins/internal/mutator"
 	"github.com/kejne/gremlins/internal/results"
 
@@ -112,7 +109,9 @@ func WithDirFs(dirFS fs.FS) Option {
 // It checks every non-test .go file in the provided fs.FS and scans it for token mutations.
 func (mu *Engine) Run(ctx context.Context) (results.Results, error) {
 	start := time.Now()
-	mutants, err := mu.discoverMutants(ctx)
+	mutants, err := mutation.Discover(ctx, mu.fs, mu.module, mutation.DiscoveryData{
+		Coverage: mu.codeData.Cov, Diff: mu.codeData.Diff, Exclusion: mu.codeData.Exclusion,
+	}, mutation.DiscoverySettings{EnabledMutators: mu.settings.EnabledMutators})
 	if ctx.Err() != nil {
 		return results.Results{}, ctx.Err()
 	}
@@ -125,126 +124,6 @@ func (mu *Engine) Run(ctx context.Context) (results.Results, error) {
 	res.Module = mu.module.Name
 
 	return res, nil
-}
-
-func (mu *Engine) discoverMutants(ctx context.Context) ([]mutator.Mutator, error) {
-	var mutants []mutator.Mutator
-	err := fs.WalkDir(mu.fs, ".", func(path string, _ fs.DirEntry, walkErr error) error {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		if walkErr != nil {
-			return fmt.Errorf("walk %q: %w", path, walkErr)
-		}
-
-		isGoCode := filepath.Ext(path) == ".go" && !strings.HasSuffix(path, "_test.go")
-		if !isGoCode || mu.codeData.Exclusion.IsFileExcluded(path) {
-			return nil
-		}
-
-		found, err := mu.runOnFile(path)
-		if err != nil {
-			return err
-		}
-		mutants = append(mutants, found...)
-
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return mutants, nil
-}
-
-func (mu *Engine) runOnFile(fileName string) ([]mutator.Mutator, error) {
-	src, err := fs.ReadFile(mu.fs, fileName)
-	if err != nil {
-		return nil, fmt.Errorf("read %q: %w", fileName, err)
-	}
-	set := token.NewFileSet()
-	file, err := parser.ParseFile(set, fileName, src, parser.ParseComments)
-	if err != nil {
-		return nil, fmt.Errorf("parse %q: %w", fileName, err)
-	}
-
-	var mutants []mutator.Mutator
-	ast.Inspect(file, func(node ast.Node) bool {
-		n, ok := NewTokenNode(node)
-		if !ok {
-			return true
-		}
-		mutants = append(mutants, mu.findMutations(fileName, set, file, n)...)
-
-		return true
-	})
-
-	return mutants, nil
-}
-
-func (mu *Engine) findMutations(fileName string, set *token.FileSet, file *ast.File, node *NodeToken) []mutator.Mutator {
-	mutantTypes, ok := TokenMutantType[node.Tok()]
-	if !ok {
-		return nil
-	}
-
-	pkg := mu.pkgName(fileName, file.Name.Name)
-	var mutants []mutator.Mutator
-	for _, mt := range mutantTypes {
-		if !mu.settings.EnabledMutators[mt] {
-			continue
-		}
-		mutantType := mt
-		tm := NewTokenMutant(pkg, set, file, node)
-		tm.SetType(mutantType)
-		tm.SetStatus(mu.mutationStatus(set.Position(node.TokPos)))
-
-		mutants = append(mutants, tm)
-	}
-
-	return mutants
-}
-
-func (mu *Engine) pkgName(fileName, fPkg string) string {
-	var pkg string
-	fn := fmt.Sprintf("%s/%s", mu.module.CallingDir, fileName)
-	p := filepath.Dir(fn)
-	for {
-		if strings.HasSuffix(p, fPkg) {
-			pkg = fmt.Sprintf("%s/%s", mu.module.Name, p)
-
-			break
-		}
-		d := filepath.Dir(p)
-		if d == p {
-			pkg = mu.module.Name
-
-			break
-		}
-		p = d
-	}
-
-	return normalisePkgPath(pkg)
-}
-
-func normalisePkgPath(pkg string) string {
-	sep := fmt.Sprintf("%c", os.PathSeparator)
-
-	return strings.ReplaceAll(pkg, sep, "/")
-}
-
-func (mu *Engine) mutationStatus(pos token.Position) mutator.Status {
-	var status mutator.Status
-
-	if mu.codeData.Cov.IsCovered(pos) {
-		status = mutator.Runnable
-	}
-
-	if !mu.codeData.Diff.IsChanged(pos) {
-		status = mutator.Skipped
-	}
-
-	return status
 }
 
 func (mu *Engine) executeTests(ctx context.Context, discovered []mutator.Mutator) results.Results {
