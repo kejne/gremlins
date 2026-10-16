@@ -30,16 +30,16 @@ import (
 	"github.com/kejne/gremlins/internal/mutator"
 )
 
-func TestTokenMutator_Apply_SetsSnippets(t *testing.T) {
+func TestTokenMutant_Apply_SetsSnippets(t *testing.T) {
 	t.Parallel()
 
 	src := "package main\n\nfunc main() {\n\ta := 1 + 2\n}\n"
 
 	testCases := map[string]struct {
-		assertFunc func(t *testing.T, mut *mutation.TokenMutator, err error)
+		assertFunc func(t *testing.T, mut *mutation.TokenMutant, err error)
 	}{
 		"should_set_orig_snippet_when_apply_is_called": {
-			assertFunc: func(t *testing.T, mut *mutation.TokenMutator, err error) {
+			assertFunc: func(t *testing.T, mut *mutation.TokenMutant, err error) {
 				t.Helper()
 				if err != nil {
 					t.Fatal(err)
@@ -51,7 +51,7 @@ func TestTokenMutator_Apply_SetsSnippets(t *testing.T) {
 			},
 		},
 		"should_set_mutated_snippet_when_apply_is_called": {
-			assertFunc: func(t *testing.T, mut *mutation.TokenMutator, err error) {
+			assertFunc: func(t *testing.T, mut *mutation.TokenMutant, err error) {
 				t.Helper()
 				if err != nil {
 					t.Fatal(err)

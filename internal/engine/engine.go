@@ -38,11 +38,11 @@ import (
 
 // Engine is the "engine" that performs the mutation testing.
 //
-// It traverses the AST of the project, finds which TokenMutator can be applied and
+// It traverses the AST of the project, finds which TokenMutant can be applied and
 // performs the actual mutation testing.
 type Engine struct {
 	fs       fs.FS
-	jDealer  execution.ExecutorDealer
+	runner   execution.Runner
 	codeData CodeData
 	module   gomodule.GoModule
 	progress func(results.Outcome)
@@ -70,11 +70,11 @@ type Option func(m Engine) Engine
 //
 // It gets a fs.FS on which to perform the analysis, a CodeData to
 // check if the mutants are executable and a sets of Option.
-func New(mod gomodule.GoModule, codeData CodeData, jDealer execution.ExecutorDealer, settings Settings, opts ...Option) Engine {
+func New(mod gomodule.GoModule, codeData CodeData, runner execution.Runner, settings Settings, opts ...Option) Engine {
 	dirFS := os.DirFS(filepath.Join(mod.Root, mod.CallingDir))
 	mut := Engine{
 		module:   mod,
-		jDealer:  jDealer,
+		runner:   runner,
 		codeData: codeData,
 		fs:       dirFS,
 		settings: settings,
@@ -127,7 +127,7 @@ func (mu *Engine) Run(ctx context.Context) (results.Results, error) {
 }
 
 func (mu *Engine) executeTests(ctx context.Context, discovered []mutator.Mutator) results.Results {
-	completed := execution.RunMutations(ctx, discovered, mu.jDealer, execution.SchedulingSettings{
+	completed := mu.runner.Run(ctx, discovered, execution.SchedulingSettings{
 		Workers: mu.settings.Workers, IntegrationMode: mu.settings.IntegrationMode,
 	}, mu.progress)
 

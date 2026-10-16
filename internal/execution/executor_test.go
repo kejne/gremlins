@@ -52,7 +52,7 @@ func TestApplyAndRollback(t *testing.T) {
 		outCh := make(chan mutator.Mutator)
 		wg := sync.WaitGroup{}
 		wg.Add(1)
-		executor := mjd.NewExecutor(mut, outCh, &wg)
+		executor := mjd.newExecutor(mut, outCh, &wg)
 		w := &workerpool.Worker{
 			Name: "test",
 			ID:   1,
@@ -93,7 +93,7 @@ func TestApplyAndRollback(t *testing.T) {
 		outCh := make(chan mutator.Mutator)
 		wg := sync.WaitGroup{}
 		wg.Add(1)
-		executor := mjd.NewExecutor(mut, outCh, &wg)
+		executor := mjd.newExecutor(mut, outCh, &wg)
 		w := &workerpool.Worker{
 			Name: "test",
 			ID:   1,
@@ -174,7 +174,7 @@ func TestMutatorTestExecution(t *testing.T) {
 			outCh := make(chan mutator.Mutator)
 			wg := sync.WaitGroup{}
 			wg.Add(1)
-			executor := mjd.NewExecutor(mut, outCh, &wg)
+			executor := mjd.newExecutor(mut, outCh, &wg)
 			w := &workerpool.Worker{
 				Name: "test",
 				ID:   1,
@@ -291,7 +291,7 @@ func TestMutatorRun(t *testing.T) {
 			outCh := make(chan mutator.Mutator)
 			wg := sync.WaitGroup{}
 			wg.Add(1)
-			executor := mjd.NewExecutor(mut, outCh, &wg)
+			executor := mjd.newExecutor(mut, outCh, &wg)
 			w := &workerpool.Worker{
 				Name: "test",
 				ID:   1,
@@ -380,7 +380,7 @@ func TestCPU(t *testing.T) {
 			outCh := make(chan mutator.Mutator)
 			wg := sync.WaitGroup{}
 			wg.Add(1)
-			executor := mjd.NewExecutor(mut, outCh, &wg)
+			executor := mjd.newExecutor(mut, outCh, &wg)
 			w := &workerpool.Worker{
 				Name: "test",
 				ID:   1,
@@ -461,7 +461,7 @@ func TestMutatorRunInTheCorrectFolder(t *testing.T) {
 		outCh := make(chan mutator.Mutator)
 		wg := sync.WaitGroup{}
 		wg.Add(1)
-		executor := mjd.NewExecutor(mut, outCh, &wg)
+		executor := mjd.newExecutor(mut, outCh, &wg)
 		w := &workerpool.Worker{
 			Name: "test",
 			ID:   1,
@@ -507,7 +507,7 @@ func TestMutatorRunInTheCorrectFolder(t *testing.T) {
 		outCh := make(chan mutator.Mutator)
 		wg := sync.WaitGroup{}
 		wg.Add(1)
-		executor := mjd.NewExecutor(mut, outCh, &wg)
+		executor := mjd.newExecutor(mut, outCh, &wg)
 		w := &workerpool.Worker{
 			Name: "test",
 			ID:   1,

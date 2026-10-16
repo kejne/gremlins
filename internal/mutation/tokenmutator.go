@@ -28,17 +28,17 @@ import (
 	"github.com/kejne/gremlins/internal/mutator"
 )
 
-// TokenMutator is a mutator.Mutator of a token.Token.
+// TokenMutant is a mutator.Mutator of a token.Token.
 //
 // Since the AST is shared among mutants, it is important to avoid that more
 // than one mutation is applied to the same file before writing it. For this
-// reason, TokenMutator contains a cache of locks, one for each file.
+// reason, TokenMutant contains a cache of locks, one for each file.
 // Every time a mutation is about to being applied, a lock is acquired for
 // the file it is operating on. Once the file is written and the token is
 // rolled back, the lock is released.
-// Keeping a lock per file instead of a lock per TokenMutator allows to apply
+// Keeping a lock per file instead of a lock per TokenMutant allows to apply
 // mutations on different files in parallel.
-type TokenMutator struct {
+type TokenMutant struct {
 	pkg         string
 	fs          *token.FileSet
 	file        *ast.File
@@ -53,9 +53,9 @@ type TokenMutator struct {
 	mutatedSnippet []byte
 }
 
-// NewTokenMutant initialises a TokenMutator.
-func NewTokenMutant(pkg string, set *token.FileSet, file *ast.File, node *NodeToken) *TokenMutator {
-	return &TokenMutator{
+// NewTokenMutant initialises a TokenMutant.
+func NewTokenMutant(pkg string, set *token.FileSet, file *ast.File, node *NodeToken) *TokenMutant {
+	return &TokenMutant{
 		pkg:       pkg,
 		fs:        set,
 		file:      file,
@@ -64,50 +64,50 @@ func NewTokenMutant(pkg string, set *token.FileSet, file *ast.File, node *NodeTo
 }
 
 // Type returns the mutation type.
-func (m *TokenMutator) Type() mutator.Type {
+func (m *TokenMutant) Type() mutator.Type {
 	return m.mutantType
 }
 
 // SetType sets the mutator.Type of the mutant.Mutator.
-func (m *TokenMutator) SetType(mt mutator.Type) {
+func (m *TokenMutant) SetType(mt mutator.Type) {
 	m.mutantType = mt
 }
 
 // Status returns the current mutation outcome status.
-func (m *TokenMutator) Status() mutator.Status {
+func (m *TokenMutant) Status() mutator.Status {
 	return m.status
 }
 
 // SetStatus sets the mutator.Status of the mutant.Mutator.
-func (m *TokenMutator) SetStatus(s mutator.Status) {
+func (m *TokenMutant) SetStatus(s mutator.Status) {
 	m.status = s
 }
 
-// Position returns the token.Position where the TokenMutator resides.
-func (m *TokenMutator) Position() token.Position {
+// Position returns the token.Position where the TokenMutant resides.
+func (m *TokenMutant) Position() token.Position {
 	return m.fs.Position(m.tokenNode.TokPos)
 }
 
-// Pos returns the token.Pos where the TokenMutator resides.
-func (m *TokenMutator) Pos() token.Pos {
+// Pos returns the token.Pos where the TokenMutant resides.
+func (m *TokenMutant) Pos() token.Pos {
 	return m.tokenNode.TokPos
 }
 
 // Pkg returns the package name to which the mutant belongs.
-func (m *TokenMutator) Pkg() string {
+func (m *TokenMutant) Pkg() string {
 	return m.pkg
 }
 
 // Apply saves the original token.Token of the mutator.Mutator and sets the
 // current token from the tokenMutations table.
 // Apply overwrites the source code file with the mutated one. It also
-// stores the original file in the TokenMutator in order to allow
+// stores the original file in the TokenMutant in order to allow
 // Rollback to put it back later.
 //
 // Apply also puts back the original Token after the mutated file write.
 // This is done in order to facilitate the atomicity of the operation,
 // avoiding locking in a method and unlocking in another.
-func (m *TokenMutator) Apply() error {
+func (m *TokenMutant) Apply() error {
 	fileLock(m.Position().Filename).Lock()
 	defer fileLock(m.Position().Filename).Unlock()
 
@@ -134,7 +134,7 @@ func (m *TokenMutator) Apply() error {
 	return nil
 }
 
-func (m *TokenMutator) writeMutatedFile(filename string) error {
+func (m *TokenMutant) writeMutatedFile(filename string) error {
 	w := &bytes.Buffer{}
 	err := printer.Fprint(w, m.fs, m.file)
 	if err != nil {
@@ -186,8 +186,8 @@ func cachedLock(filename string) (*sync.Mutex, bool) {
 }
 
 // Rollback puts back the original file after the test and cleans up the
-// TokenMutator to free memory.
-func (m *TokenMutator) Rollback() error {
+// TokenMutant to free memory.
+func (m *TokenMutant) Rollback() error {
 	defer m.resetOrigFile()
 	filename := filepath.Join(m.workDir, m.Position().Filename)
 
@@ -196,30 +196,30 @@ func (m *TokenMutator) Rollback() error {
 
 // SetWorkdir sets the base path on which to Apply and Rollback operations.
 //
-// By default, TokenMutator will operate on the same source on which the analysis
+// By default, TokenMutant will operate on the same source on which the analysis
 // was performed. Changing the workdir will prevent the modifications of the
 // original files.
-func (m *TokenMutator) SetWorkdir(path string) {
+func (m *TokenMutant) SetWorkdir(path string) {
 	m.workDir = path
 }
 
 // Workdir returns the current working dir in which the mutator.Mutator will apply its mutations.
-func (m *TokenMutator) Workdir() string {
+func (m *TokenMutant) Workdir() string {
 	return m.workDir
 }
 
-func (m *TokenMutator) resetOrigFile() {
+func (m *TokenMutant) resetOrigFile() {
 	var zeroByte []byte
 	m.origFile = zeroByte
 }
 
 // OrigSnippet returns the original code snippet around the mutation point.
-func (m *TokenMutator) OrigSnippet() []byte {
+func (m *TokenMutant) OrigSnippet() []byte {
 	return m.origSnippet
 }
 
 // MutatedSnippet returns the mutated code snippet around the mutation point.
-func (m *TokenMutator) MutatedSnippet() []byte {
+func (m *TokenMutant) MutatedSnippet() []byte {
 	return m.mutatedSnippet
 }
 

@@ -43,7 +43,7 @@ deps:
     mayDependOn: [cli, execution, logging, results]
     canUse: [color]
   cli:
-    mayDependOn: [cli-bin, configuration, coverage, diff, engine, execution, exclusion, flags, gomodule, logging, mutator, reporting]
+    mayDependOn: [cli-bin, configuration, coverage, diff, engine, execution, exclusion, flags, gomodule, logging, mutator, reporting, results]
     canUse: [cobra, pflag, viper, heredoc]
   flags:
     canUse: [cobra, pflag, viper]

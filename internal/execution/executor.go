@@ -34,8 +34,21 @@ import (
 	"github.com/kejne/gremlins/internal/results"
 )
 
-// RunMutations schedules mutation work and returns detached completed outcomes.
-func RunMutations(ctx context.Context, discovered []mutator.Mutator, dealer ExecutorDealer, settings SchedulingSettings, onComplete func(results.Outcome)) results.Results {
+// Runner executes discovered mutations and returns detached completed outcomes.
+type Runner interface {
+	Run(ctx context.Context, discovered []mutator.Mutator, settings SchedulingSettings, onComplete func(results.Outcome)) results.Results
+}
+
+type mutationRunner struct {
+	dealer *MutantExecutorDealer
+}
+
+// NewRunner creates an execution runner using the provided mutation executor.
+func NewRunner(dealer *MutantExecutorDealer) Runner {
+	return mutationRunner{dealer: dealer}
+}
+
+func (r mutationRunner) Run(ctx context.Context, discovered []mutator.Mutator, settings SchedulingSettings, onComplete func(results.Outcome)) results.Results {
 	pool := workerpool.Initialize("mutator", workerpool.Settings{Workers: settings.Workers, IntegrationMode: settings.IntegrationMode})
 	pool.Start()
 	out := make(chan mutator.Mutator)
@@ -52,7 +65,7 @@ func RunMutations(ctx context.Context, discovered []mutator.Mutator, dealer Exec
 			default:
 			}
 			wg.Add(1)
-			pool.AppendExecutor(dealer.NewExecutor(mutation, out, &wg))
+			pool.AppendExecutor(r.dealer.newExecutor(mutation, out, &wg))
 		}
 	}()
 	go func() { wg.Wait(); close(out) }()
@@ -78,11 +91,6 @@ type SchedulingSettings struct {
 // of each test run.
 const DefaultTimeoutCoefficient = 5
 
-// ExecutorDealer is the initializer for new workerpool.Executor.
-type ExecutorDealer interface {
-	NewExecutor(mut mutator.Mutator, outCh chan<- mutator.Mutator, wg *sync.WaitGroup) workerpool.Executor
-}
-
 // ExecutorSettings contains options used to execute mutant tests.
 type ExecutorSettings struct {
 	BuildTags          string
@@ -97,7 +105,7 @@ type ExecutorSettings struct {
 // By default, it sets uses exec.Command to perform the tests on the source
 // code. This can be overridden, for example in tests.
 //
-// The apply and rollback functions are wrappers around the TokenMutator apply and
+// The apply and rollback functions are wrappers around the TokenMutant apply and
 // rollback. These can be overridden with nop functions in tests. Not an
 // ideal setup. In the future we can think of a better way to handle this.
 type MutantExecutorDealer struct {
@@ -165,11 +173,8 @@ func NewExecutorDealer(mod gomodule.GoModule, wdd workdir.Dealer, elapsed time.D
 	return &jd
 }
 
-// NewExecutor returns a new workerpool.Executor for the given mutator.Mutator.
-// It gets an output channel of mutator.Mutator and a sync.WaitGroup. The channel
-// will stream the results of the executor, and the wait group will be done when the
-// executor is complete.
-func (m MutantExecutorDealer) NewExecutor(mut mutator.Mutator, outCh chan<- mutator.Mutator, wg *sync.WaitGroup) workerpool.Executor {
+// newExecutor creates a worker-pool executor for one mutation.
+func (m MutantExecutorDealer) newExecutor(mut mutator.Mutator, outCh chan<- mutator.Mutator, wg *sync.WaitGroup) workerpool.Executor {
 	mj := mutantExecutor{
 		mutant:            mut,
 		outCh:             outCh,
@@ -207,9 +212,9 @@ type mutantExecutor struct {
 // method responsible for performing the actual mutation testing.
 // The executor runs on its mutator.Mutator.
 // If it is RUNNABLE, and it is not in dry-run mode, it will apply the mutation,
-// run the tests and mark the TokenMutator as either KILLED or LIVED depending
-// on the result. If the tests pass, it means the TokenMutator survived, so it
-// will be LIVED, if the tests fail, the TokenMutator will be KILLED.
+// run the tests and mark the TokenMutant as either KILLED or LIVED depending
+// on the result. If the tests pass, it means the TokenMutant survived, so it
+// will be LIVED, if the tests fail, the TokenMutant will be KILLED.
 // The timeout of the test is managed outside the run of the test, using
 // a context with timeout. This is done because the Go test command doesn't
 // make it easy to distinguish failures from timeouts.

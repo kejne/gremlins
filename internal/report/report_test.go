@@ -19,7 +19,6 @@ package report_test
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"go/token"
 	"os"
 	"path/filepath"
@@ -116,7 +115,7 @@ func TestReport(t *testing.T) {
 				Elapsed:  (2 * time.Minute) + (22 * time.Second) + (123 * time.Millisecond),
 			}
 
-			_ = report.Do(data, reportSettingsForTest())
+			_ = report.Do(data, reportStatsForTest(data), reportSettingsForTest())
 
 			got := out.String()
 
@@ -170,7 +169,7 @@ func TestReport(t *testing.T) {
 				Elapsed:  (2 * time.Minute) + (22 * time.Second) + (123 * time.Millisecond),
 			}
 
-			_ = report.Do(data, reportSettingsForTest())
+			_ = report.Do(data, reportStatsForTest(data), reportSettingsForTest())
 
 			got := out.String()
 
@@ -205,10 +204,10 @@ func TestAssessment(t *testing.T) {
 			expectError: true,
 		},
 		{
-			name:        "efficacy >= efficacy-threshold",
+			name:        "efficacy equals efficacy-threshold",
 			confKey:     configuration.UnleashThresholdEfficacyKey,
 			value:       float64(50),
-			expectError: false,
+			expectError: true,
 		},
 		{
 			name:        "efficacy-threshold == 0",
@@ -231,10 +230,10 @@ func TestAssessment(t *testing.T) {
 			expectError: true,
 		},
 		{
-			name:        "coverage >= coverage-threshold",
+			name:        "coverage equals coverage-threshold",
 			confKey:     configuration.UnleashThresholdMCoverageKey,
 			value:       float64(50),
-			expectError: false,
+			expectError: true,
 		},
 		{
 			name:        "coverage-threshold == 0",
@@ -272,16 +271,28 @@ func TestAssessment(t *testing.T) {
 				Elapsed:  1 * time.Minute,
 			}
 
-			err := report.Do(data, reportSettingsForTest())
-
-			if tc.expectError && err == nil {
-				t.Fatal("expected an error")
+			threshold := configuration.Get[float64](tc.confKey)
+			if threshold == 0 {
+				threshold = float64(configuration.Get[int](tc.confKey))
 			}
-			if !tc.expectError {
-				return
+			assessmentSettings := results.Settings{}
+			if tc.confKey == configuration.UnleashThresholdEfficacyKey {
+				assessmentSettings.ThresholdEfficacy = threshold
+			} else {
+				assessmentSettings.ThresholdMutantCoverage = threshold
 			}
-			if !errors.Is(err, results.ErrEfficacyBelowThreshold) && !errors.Is(err, results.ErrCoverageBelowThreshold) {
-				t.Errorf("expected assessment error, got %T", err)
+			stats, assessmentErr := results.Assess(data.Outcomes, assessmentSettings)
+			out := &bytes.Buffer{}
+			log.Reset()
+			log.Init(out, &bytes.Buffer{})
+			if err := report.Do(data, stats, reportSettingsForTest()); err != nil {
+				t.Fatalf("presentation should not assess thresholds: %v", err)
+			}
+			if tc.expectError != (assessmentErr != nil) {
+				t.Fatalf("assessment error = %v, want error %t", assessmentErr, tc.expectError)
+			}
+			if out.Len() == 0 {
+				t.Fatal("report should render regardless of assessment failure")
 			}
 		})
 	}
@@ -301,8 +312,12 @@ func TestAssessmentWithOnlySkippedMutants(t *testing.T) {
 		Elapsed: time.Minute,
 	}
 
-	if err := report.Do(data, reportSettingsForTest()); err != nil {
+	stats, err := results.Assess(data.Outcomes, results.Settings{ThresholdEfficacy: 80, ThresholdMutantCoverage: 80})
+	if err != nil {
 		t.Fatalf("thresholds should not fail when --diff has no applicable mutants: %v", err)
+	}
+	if err := report.Do(data, stats, reportSettingsForTest()); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -319,7 +334,7 @@ func TestMutantNoDiff(t *testing.T) {
 			originSnippet:  []byte("x > y\n"),
 			mutatedSnippet: []byte("x >= y\n"),
 		}
-		report.Mutant(m)
+		report.MutantOutcome(results.Snapshot(m))
 
 		want := "       LIVED CONDITIONALS_BOUNDARY at aFolder/aFile.go:12:3\n"
 		got := out.String()
@@ -415,7 +430,7 @@ func TestMutantDiff(t *testing.T) {
 				originSnippet:  tc.originSnippet,
 				mutatedSnippet: tc.mutatedSnippet,
 			}
-			report.MutantDiff(m)
+			report.MutantOutcomeDiff(results.Snapshot(m))
 
 			tc.assertFunc(t, out, errOut)
 		})
@@ -429,19 +444,19 @@ func TestMutantLog(t *testing.T) {
 	defer log.Reset()
 
 	m := stubMutant{status: mutator.Lived, mutantType: mutator.ConditionalsBoundary, position: fakePosition}
-	report.Mutant(m)
+	report.MutantOutcome(results.Snapshot(m))
 	m = stubMutant{status: mutator.Killed, mutantType: mutator.ConditionalsBoundary, position: fakePosition}
-	report.Mutant(m)
+	report.MutantOutcome(results.Snapshot(m))
 	m = stubMutant{status: mutator.NotCovered, mutantType: mutator.ConditionalsBoundary, position: fakePosition}
-	report.Mutant(m)
+	report.MutantOutcome(results.Snapshot(m))
 	m = stubMutant{status: mutator.Runnable, mutantType: mutator.ConditionalsBoundary, position: fakePosition}
-	report.Mutant(m)
+	report.MutantOutcome(results.Snapshot(m))
 	m = stubMutant{status: mutator.NotViable, mutantType: mutator.ConditionalsBoundary, position: fakePosition}
-	report.Mutant(m)
+	report.MutantOutcome(results.Snapshot(m))
 	m = stubMutant{status: mutator.TimedOut, mutantType: mutator.ConditionalsBoundary, position: fakePosition}
-	report.Mutant(m)
+	report.MutantOutcome(results.Snapshot(m))
 	m = stubMutant{status: mutator.Skipped, mutantType: mutator.ConditionalsBoundary, position: fakePosition}
-	report.Mutant(m)
+	report.MutantOutcome(results.Snapshot(m))
 
 	got := out.String()
 
@@ -490,7 +505,7 @@ func TestReportToFile(t *testing.T) {
 		viper.Set(configuration.UnleashOutputKey, output)
 		defer viper.Reset()
 
-		if err := report.Do(data, reportSettingsForTest()); err != nil {
+		if err := report.Do(data, reportStatsForTest(data), reportSettingsForTest()); err != nil {
 			t.Fatal("error not expected")
 		}
 
@@ -515,7 +530,7 @@ func TestReportToFile(t *testing.T) {
 		outDir := t.TempDir()
 		output := filepath.Join(outDir, outFile)
 
-		if err := report.Do(data, reportSettingsForTest()); err != nil {
+		if err := report.Do(data, reportStatsForTest(data), reportSettingsForTest()); err != nil {
 			t.Fatal("error not expected")
 		}
 
@@ -534,7 +549,7 @@ func TestReportToFile(t *testing.T) {
 		viper.Set(configuration.UnleashOutputKey, output)
 		defer viper.Reset()
 
-		if err := report.Do(data, reportSettingsForTest()); err != nil {
+		if err := report.Do(data, reportStatsForTest(data), reportSettingsForTest()); err != nil {
 			t.Fatal("error not expected")
 		}
 

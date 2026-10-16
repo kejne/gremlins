@@ -13,6 +13,7 @@ import (
 	"github.com/kejne/gremlins/internal/log"
 	"github.com/kejne/gremlins/internal/mutator"
 	"github.com/kejne/gremlins/internal/report"
+	"github.com/kejne/gremlins/internal/results"
 )
 
 func Test_parseFilter(t *testing.T) {
@@ -130,23 +131,23 @@ func TestLogger(t *testing.T) {
 	configuration.Set(configuration.UnleashOutputStatusesKey, "lp")
 	logger := report.NewLogger(report.LoggerSettings{OutputStatuses: configuration.Get[string](configuration.UnleashOutputStatusesKey), OutputDiffStatuses: configuration.Get[string](configuration.UnleashOutputDiffStatusesKey)}) // prints error
 
-	logger.Mutant(m) // prints Not covered because no filter
+	logger.Outcome(results.Snapshot(m)) // prints Not covered because no filter
 
 	m.status = mutator.Killed
 
 	configuration.Set(configuration.UnleashOutputStatusesKey, "")
 	logger = report.NewLogger(report.LoggerSettings{OutputStatuses: configuration.Get[string](configuration.UnleashOutputStatusesKey), OutputDiffStatuses: configuration.Get[string](configuration.UnleashOutputDiffStatusesKey)})
 
-	logger.Mutant(m) // prints Killed because no filter
+	logger.Outcome(results.Snapshot(m)) // prints Killed because no filter
 
 	configuration.Set(configuration.UnleashOutputStatusesKey, "l")
 	logger = report.NewLogger(report.LoggerSettings{OutputStatuses: configuration.Get[string](configuration.UnleashOutputStatusesKey), OutputDiffStatuses: configuration.Get[string](configuration.UnleashOutputDiffStatusesKey)})
 
-	logger.Mutant(m) // Killed filtered
+	logger.Outcome(results.Snapshot(m)) // Killed filtered
 
 	m.status = mutator.Lived
 
-	logger.Mutant(m) // prints Lived because no filter
+	logger.Outcome(results.Snapshot(m)) // prints Lived because no filter
 
 	got := out.String()
 
@@ -172,13 +173,13 @@ func TestLoggerOutputStatusesAndDiffStatusesTogether(t *testing.T) {
 		defer configuration.Reset()
 
 		logger := report.NewLogger(report.LoggerSettings{OutputStatuses: configuration.Get[string](configuration.UnleashOutputStatusesKey), OutputDiffStatuses: configuration.Get[string](configuration.UnleashOutputDiffStatusesKey)})
-		logger.Mutant(stubMutant{
+		logger.Outcome(results.Snapshot(stubMutant{
 			status:         mutator.Lived,
 			mutantType:     mutator.ConditionalsBoundary,
 			position:       fakePosition,
 			originSnippet:  []byte("x > y\n"),
 			mutatedSnippet: []byte("x >= y\n"),
-		})
+		}))
 
 		if out.Len() > 0 {
 			t.Errorf("expected no output for filtered-out mutant, got: %q", out.String())
@@ -198,13 +199,13 @@ func TestLoggerOutputStatusesAndDiffStatusesTogether(t *testing.T) {
 		defer configuration.Reset()
 
 		logger := report.NewLogger(report.LoggerSettings{OutputStatuses: configuration.Get[string](configuration.UnleashOutputStatusesKey), OutputDiffStatuses: configuration.Get[string](configuration.UnleashOutputDiffStatusesKey)})
-		logger.Mutant(stubMutant{
+		logger.Outcome(results.Snapshot(stubMutant{
 			status:         mutator.Killed,
 			mutantType:     mutator.ConditionalsBoundary,
 			position:       fakePosition,
 			originSnippet:  []byte("x > y\n"),
 			mutatedSnippet: []byte("x >= y\n"),
-		})
+		}))
 
 		got := out.String()
 		statusLine := "      KILLED CONDITIONALS_BOUNDARY at aFolder/aFile.go:12:3\n"
@@ -235,8 +236,7 @@ func TestLoggerOutputDiffStatuses(t *testing.T) {
 		defer configuration.Reset()
 
 		logger := report.NewLogger(report.LoggerSettings{OutputStatuses: configuration.Get[string](configuration.UnleashOutputStatusesKey), OutputDiffStatuses: configuration.Get[string](configuration.UnleashOutputDiffStatusesKey)})
-		logger.Mutant(livedWithSnippets)
-
+		logger.Outcome(results.Snapshot(livedWithSnippets))
 		got := out.String()
 		if !strings.HasPrefix(got, statusLine) {
 			t.Errorf("expected status line prefix, got: %q", got)
@@ -254,8 +254,7 @@ func TestLoggerOutputDiffStatuses(t *testing.T) {
 		defer configuration.Reset()
 
 		logger := report.NewLogger(report.LoggerSettings{OutputStatuses: configuration.Get[string](configuration.UnleashOutputStatusesKey), OutputDiffStatuses: configuration.Get[string](configuration.UnleashOutputDiffStatusesKey)})
-		logger.Mutant(livedWithSnippets)
-
+		logger.Outcome(results.Snapshot(livedWithSnippets))
 		got := out.String()
 		if got != statusLine {
 			t.Errorf("expected only status line, got: %q", got)
@@ -268,8 +267,7 @@ func TestLoggerOutputDiffStatuses(t *testing.T) {
 		defer log.Reset()
 
 		logger := report.NewLogger(report.LoggerSettings{OutputStatuses: configuration.Get[string](configuration.UnleashOutputStatusesKey), OutputDiffStatuses: configuration.Get[string](configuration.UnleashOutputDiffStatusesKey)})
-		logger.Mutant(livedWithSnippets)
-
+		logger.Outcome(results.Snapshot(livedWithSnippets))
 		got := out.String()
 		if got != statusLine {
 			t.Errorf("expected only status line, got: %q", got)
@@ -278,19 +276,14 @@ func TestLoggerOutputDiffStatuses(t *testing.T) {
 }
 
 func reportSettingsForTest() report.Settings {
-	efficacy := configuration.Get[float64](configuration.UnleashThresholdEfficacyKey)
-	if efficacy == 0 {
-		efficacy = float64(configuration.Get[int](configuration.UnleashThresholdEfficacyKey))
-	}
-	coverage := configuration.Get[float64](configuration.UnleashThresholdMCoverageKey)
-	if coverage == 0 {
-		coverage = float64(configuration.Get[int](configuration.UnleashThresholdMCoverageKey))
-	}
-
 	return report.Settings{
-		DryRun:                  configuration.Get[bool](configuration.UnleashDryRunKey),
-		Output:                  configuration.Get[string](configuration.UnleashOutputKey),
-		ThresholdEfficacy:       efficacy,
-		ThresholdMutantCoverage: coverage,
+		DryRun: configuration.Get[bool](configuration.UnleashDryRunKey),
+		Output: configuration.Get[string](configuration.UnleashOutputKey),
 	}
+}
+
+func reportStatsForTest(data report.Results) results.Stats {
+	stats, _ := results.Assess(data.Outcomes, results.Settings{DryRun: reportSettingsForTest().DryRun})
+
+	return stats
 }

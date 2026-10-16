@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"sync"
 	"testing"
 	"testing/fstest"
 
@@ -28,7 +27,6 @@ import (
 	"github.com/kejne/gremlins/internal/coverage"
 	"github.com/kejne/gremlins/internal/diff"
 	"github.com/kejne/gremlins/internal/engine"
-	"github.com/kejne/gremlins/internal/execution/workerpool"
 	"github.com/kejne/gremlins/internal/gomodule"
 	"github.com/kejne/gremlins/internal/log"
 	"github.com/kejne/gremlins/internal/mutator"
@@ -65,7 +63,15 @@ func TestWorkflowDiscoversExecutesAndAssessesMutations(t *testing.T) {
 			Cov:  coverageProfile,
 			Diff: diff.Diff{diff.FileName(sourceFile): {{StartLine: 3, EndLine: 3}}},
 		},
-		controlledOutcomeDealer{},
+		&runnerStub{complete: func(mutation mutator.Mutator) {
+			if mutation.Status() == mutator.Runnable {
+				if mutation.Type() == mutator.ConditionalsBoundary {
+					mutation.SetStatus(mutator.Killed)
+				} else {
+					mutation.SetStatus(mutator.Lived)
+				}
+			}
+		}},
 		engine.Settings{EnabledMutators: map[mutator.Type]bool{
 			mutator.ConditionalsBoundary: true,
 			mutator.ConditionalsNegation: true,
@@ -114,32 +120,11 @@ func TestWorkflowDiscoversExecutesAndAssessesMutations(t *testing.T) {
 		t.Errorf("progress conditional-negation outcome = %s, result outcome = %s", got, statuses[mutator.ConditionalsNegation])
 	}
 
-	err = report.Do(results, report.Settings{ThresholdEfficacy: 75})
+	stats, err := resultvalues.Assess(results.Outcomes, resultvalues.Settings{ThresholdEfficacy: 75})
 	if !errors.Is(err, resultvalues.ErrEfficacyBelowThreshold) {
 		t.Fatalf("assessment error = %v, want efficacy-threshold", err)
 	}
-}
-
-type controlledOutcomeDealer struct{}
-
-func (controlledOutcomeDealer) NewExecutor(mutation mutator.Mutator, out chan<- mutator.Mutator, wg *sync.WaitGroup) workerpool.Executor {
-	return controlledOutcomeExecutor{mutation: mutation, out: out, wg: wg}
-}
-
-type controlledOutcomeExecutor struct {
-	mutation mutator.Mutator
-	out      chan<- mutator.Mutator
-	wg       *sync.WaitGroup
-}
-
-func (executor controlledOutcomeExecutor) Start(_ *workerpool.Worker) {
-	if executor.mutation.Status() == mutator.Runnable {
-		if executor.mutation.Type() == mutator.ConditionalsBoundary {
-			executor.mutation.SetStatus(mutator.Killed)
-		} else {
-			executor.mutation.SetStatus(mutator.Lived)
-		}
+	if err := report.Do(results, stats, report.Settings{}); err != nil {
+		t.Fatalf("reporting should not own assessment: %v", err)
 	}
-	executor.out <- executor.mutation
-	executor.wg.Done()
 }

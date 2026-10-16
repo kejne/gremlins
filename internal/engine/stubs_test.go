@@ -17,6 +17,7 @@
 package engine_test
 
 import (
+	"context"
 	"errors"
 	"go/token"
 	"io"
@@ -28,9 +29,9 @@ import (
 
 	"github.com/kejne/gremlins/internal/configuration"
 	"github.com/kejne/gremlins/internal/execution"
-	"github.com/kejne/gremlins/internal/execution/workerpool"
 	"github.com/kejne/gremlins/internal/gomodule"
 	"github.com/kejne/gremlins/internal/mutator"
+	"github.com/kejne/gremlins/internal/results"
 )
 
 var viperMutex sync.RWMutex
@@ -109,35 +110,26 @@ func (dealerStub) Clean() {}
 
 func (dealerStub) WorkDir() string { return "/tmp" }
 
-type executorDealerStub struct {
+type runnerStub struct {
 	gotMutants []mutator.Mutator
+	complete   func(mutator.Mutator)
 }
 
-func newJobDealerStub(t *testing.T) *executorDealerStub {
-	t.Helper()
-
-	return &executorDealerStub{}
-}
-
-func (j *executorDealerStub) NewExecutor(mut mutator.Mutator, outCh chan<- mutator.Mutator, wg *sync.WaitGroup) workerpool.Executor {
-	j.gotMutants = append(j.gotMutants, mut)
-
-	return &executorStub{
-		mut:   mut,
-		outCh: outCh,
-		wg:    wg,
+func (r *runnerStub) Run(_ context.Context, discovered []mutator.Mutator, _ execution.SchedulingSettings, onComplete func(results.Outcome)) results.Results {
+	r.gotMutants = append(r.gotMutants, discovered...)
+	outcomes := make([]results.Outcome, 0, len(discovered))
+	for _, mutation := range discovered {
+		if r.complete != nil {
+			r.complete(mutation)
+		}
+		outcome := results.Snapshot(mutation)
+		outcomes = append(outcomes, outcome)
+		if onComplete != nil {
+			onComplete(outcome)
+		}
 	}
-}
 
-type executorStub struct {
-	mut   mutator.Mutator
-	outCh chan<- mutator.Mutator
-	wg    *sync.WaitGroup
-}
-
-func (j *executorStub) Start(_ *workerpool.Worker) {
-	j.outCh <- j.mut
-	j.wg.Done()
+	return results.Results{Outcomes: outcomes}
 }
 
 type mutantStub struct {

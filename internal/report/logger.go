@@ -50,11 +50,6 @@ func NewLogger(settings LoggerSettings) MutantLogger {
 	}
 }
 
-// Mutant logs a mutant if it passes the filter, then optionally prints the diff.
-func (l MutantLogger) Mutant(m mutator.Mutator) {
-	l.Outcome(results.Snapshot(m))
-}
-
 // Outcome logs a completed mutation outcome if it passes the configured filters.
 func (l MutantLogger) Outcome(outcome results.Outcome) {
 	if l.Filter != nil {
