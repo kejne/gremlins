@@ -27,7 +27,6 @@ import (
 	"github.com/fatih/color"
 	"github.com/hako/durafmt"
 
-	"github.com/kejne/gremlins/internal/configuration"
 	"github.com/kejne/gremlins/internal/execution"
 	"github.com/kejne/gremlins/internal/log"
 	"github.com/kejne/gremlins/internal/mutator"
@@ -50,6 +49,14 @@ type Results struct {
 	Elapsed time.Duration
 }
 
+// Settings contains report output and quality-gate options resolved by the CLI.
+type Settings struct {
+	DryRun                  bool
+	Output                  string
+	ThresholdEfficacy       float64
+	ThresholdMutantCoverage float64
+}
+
 type reportStatus struct {
 	files map[string][]internal.Mutation
 
@@ -68,15 +75,17 @@ type reportStatus struct {
 
 	tEfficacy float64
 	mCovered  float64
+	settings  Settings
 }
 
-func newReport(results Results) (*reportStatus, bool) {
+func newReport(results Results, settings Settings) (*reportStatus, bool) {
 	if len(results.Mutants) == 0 {
 		return nil, false
 	}
 	rep := &reportStatus{
-		module:  results.Module,
-		elapsed: durafmt.Parse(results.Elapsed).LimitFirstN(2),
+		module:   results.Module,
+		elapsed:  durafmt.Parse(results.Elapsed).LimitFirstN(2),
+		settings: settings,
 	}
 	rep.files = make(map[string][]internal.Mutation)
 	for _, m := range results.Mutants {
@@ -150,8 +159,8 @@ func reportMutatorType(m mutator.Mutator, rep *reportStatus) {
 	}
 }
 
-func (*reportStatus) isDryRun() bool {
-	return configuration.Get[bool](configuration.UnleashDryRunKey)
+func (r *reportStatus) isDryRun() bool {
+	return r.settings.DryRun
 }
 
 func (r *reportStatus) reportFindings() {
@@ -164,7 +173,7 @@ func (r *reportStatus) reportFindings() {
 }
 
 func (r *reportStatus) fileReport() {
-	if output := configuration.Get[string](configuration.UnleashOutputKey); output != "" {
+	if output := r.settings.Output; output != "" {
 		files := make([]internal.OutputFile, 0, len(r.files))
 		for fName, mutations := range r.files {
 			of := internal.OutputFile{Filename: fName}
@@ -231,17 +240,11 @@ func (r *reportStatus) assess(tEfficacy, rCoverage float64) error {
 		return nil
 	}
 
-	et := configuration.Get[float64](configuration.UnleashThresholdEfficacyKey)
-	if et == 0 {
-		et = float64(configuration.Get[int](configuration.UnleashThresholdEfficacyKey))
-	}
+	et := r.settings.ThresholdEfficacy
 	if et > 0 && r.killed+r.lived > 0 && tEfficacy <= et {
 		return execution.NewExitErr(execution.EfficacyThreshold)
 	}
-	ct := configuration.Get[float64](configuration.UnleashThresholdMCoverageKey)
-	if ct == 0 {
-		ct = float64(configuration.Get[int](configuration.UnleashThresholdMCoverageKey))
-	}
+	ct := r.settings.ThresholdMutantCoverage
 	if ct > 0 && r.killed+r.lived+r.notCovered > 0 && rCoverage <= ct {
 		return execution.NewExitErr(execution.MutantCoverageThreshold)
 	}
@@ -253,8 +256,8 @@ func (r *reportStatus) assess(tEfficacy, rCoverage float64) error {
 // This function uses the log package in gremlins to write to the
 // chosen io.Writer, so it is necessary to call log.Init before
 // the report generation.
-func Do(results Results) error {
-	rep, ok := newReport(results)
+func Do(results Results, settings Settings) error {
+	rep, ok := newReport(results, settings)
 	if !ok {
 		log.Infoln("\nNo results to report.")
 

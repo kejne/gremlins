@@ -499,7 +499,7 @@ func TestMutations(t *testing.T) {
 			mapFS, mod, c := loadFixture(tc.fixture, ".")
 			defer c()
 
-			mut := engine.New(mod, engine.CodeData{Cov: tc.covResult.Profile}, newJobDealerStub(t), engine.WithDirFs(mapFS))
+			mut := engine.New(mod, engine.CodeData{Cov: tc.covResult.Profile}, newJobDealerStub(t), engine.Settings{EnabledMutators: enabledMutatorsForTest(), Workers: configuration.Get[int](configuration.UnleashWorkersKey), IntegrationMode: configuration.Get[bool](configuration.UnleashIntegrationMode)}, engine.WithDirFs(mapFS))
 			res, err := mut.Run(context.Background())
 			if err != nil {
 				t.Fatal(err)
@@ -538,7 +538,7 @@ func TestMutantSkipDisabled(t *testing.T) {
 			})
 			defer viperReset()
 
-			mut := engine.New(mod, testCodeData, newJobDealerStub(t), engine.WithDirFs(mapFS))
+			mut := engine.New(mod, testCodeData, newJobDealerStub(t), engine.Settings{EnabledMutators: enabledMutatorsForTest(), Workers: configuration.Get[int](configuration.UnleashWorkersKey), IntegrationMode: configuration.Get[bool](configuration.UnleashIntegrationMode)}, engine.WithDirFs(mapFS))
 			res, err := mut.Run(context.Background())
 			if err != nil {
 				t.Fatal(err)
@@ -566,7 +566,7 @@ func TestDisablingOneMutantTypeDoesNotDisableOthersForSameToken(t *testing.T) {
 	})
 	defer viperReset()
 
-	mut := engine.New(mod, testCodeData, newJobDealerStub(t), engine.WithDirFs(mapFS))
+	mut := engine.New(mod, testCodeData, newJobDealerStub(t), engine.Settings{EnabledMutators: enabledMutatorsForTest(), Workers: configuration.Get[int](configuration.UnleashWorkersKey), IntegrationMode: configuration.Get[bool](configuration.UnleashIntegrationMode)}, engine.WithDirFs(mapFS))
 	res, err := mut.Run(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -605,7 +605,7 @@ func TestSkipTestAndNonGoFiles(t *testing.T) {
 	}
 	viperSet(map[string]any{configuration.UnleashDryRunKey: true})
 	defer viperReset()
-	mut := engine.New(mod, engine.CodeData{}, newJobDealerStub(t), engine.WithDirFs(sys))
+	mut := engine.New(mod, engine.CodeData{}, newJobDealerStub(t), engine.Settings{EnabledMutators: enabledMutatorsForTest(), Workers: configuration.Get[int](configuration.UnleashWorkersKey), IntegrationMode: configuration.Get[bool](configuration.UnleashIntegrationMode)}, engine.WithDirFs(sys))
 	res, err := mut.Run(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -635,7 +635,7 @@ func TestSkipNotDiffMutants(t *testing.T) {
 	codeData := engine.CodeData{Diff: diff.Diff{
 		"file.go": nil,
 	}}
-	mut := engine.New(mod, codeData, newJobDealerStub(t), engine.WithDirFs(sys))
+	mut := engine.New(mod, codeData, newJobDealerStub(t), engine.Settings{EnabledMutators: enabledMutatorsForTest(), Workers: configuration.Get[int](configuration.UnleashWorkersKey), IntegrationMode: configuration.Get[bool](configuration.UnleashIntegrationMode)}, engine.WithDirFs(sys))
 	res, err := mut.Run(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -684,7 +684,7 @@ func TestDiscoveryErrorsFailBeforeExecution(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mod := gomodule.GoModule{Name: expectedModule, Root: ".", CallingDir: "."}
 			dealer := newJobDealerStub(t)
-			mut := engine.New(mod, engine.CodeData{}, dealer, engine.WithDirFs(tc.fs))
+			mut := engine.New(mod, engine.CodeData{}, dealer, engine.Settings{EnabledMutators: enabledMutatorsForTest()}, engine.WithDirFs(tc.fs))
 
 			_, err := mut.Run(context.Background())
 			if err == nil || !strings.Contains(err.Error(), tc.want) {
@@ -722,7 +722,7 @@ func TestStopsOnCancelDuringDiscovery(t *testing.T) {
 	}
 	mod := gomodule.GoModule{Name: expectedModule, Root: ".", CallingDir: "."}
 	dealer := newJobDealerStub(t)
-	mut := engine.New(mod, engine.CodeData{}, dealer, engine.WithDirFs(mapFS))
+	mut := engine.New(mod, engine.CodeData{}, dealer, engine.Settings{EnabledMutators: enabledMutatorsForTest()}, engine.WithDirFs(mapFS))
 
 	res, err := mut.Run(ctx)
 	if !errors.Is(err, context.Canceled) {
@@ -749,7 +749,7 @@ func TestStopsOnCancel(t *testing.T) {
 	mapFS, mod, c := loadFixture(defaultFixture, ".")
 	defer c()
 
-	mut := engine.New(mod, testCodeData, newJobDealerStub(t), engine.WithDirFs(mapFS))
+	mut := engine.New(mod, testCodeData, newJobDealerStub(t), engine.Settings{EnabledMutators: enabledMutatorsForTest(), Workers: configuration.Get[int](configuration.UnleashWorkersKey), IntegrationMode: configuration.Get[bool](configuration.UnleashIntegrationMode)}, engine.WithDirFs(mapFS))
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -795,7 +795,7 @@ func TestPackageDiscovery(t *testing.T) {
 			defer c()
 
 			jds := newJobDealerStub(t)
-			mut := engine.New(mod, testCodeData, jds, engine.WithDirFs(mapFS))
+			mut := engine.New(mod, testCodeData, jds, engine.Settings{EnabledMutators: enabledMutatorsForTest()}, engine.WithDirFs(mapFS))
 
 			if _, err := mut.Run(context.Background()); err != nil {
 				t.Fatal(err)

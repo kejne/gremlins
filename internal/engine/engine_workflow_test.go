@@ -65,6 +65,10 @@ func TestWorkflowDiscoversExecutesAndAssessesMutations(t *testing.T) {
 			Diff: diff.Diff{diff.FileName(sourceFile): {{StartLine: 3, EndLine: 3}}},
 		},
 		controlledOutcomeDealer{},
+		engine.Settings{EnabledMutators: map[mutator.Type]bool{
+			mutator.ConditionalsBoundary: true,
+			mutator.ConditionalsNegation: true,
+		}, Workers: 1},
 		engine.WithDirFs(workflowFS),
 	)
 	results, err := workflow.Run(context.Background())
@@ -92,7 +96,7 @@ func TestWorkflowDiscoversExecutesAndAssessesMutations(t *testing.T) {
 		t.Errorf("conditional-negation outcome = %s, want lived", got)
 	}
 
-	err = report.Do(results)
+	err = report.Do(results, report.Settings{ThresholdEfficacy: 75})
 	var exitErr *execution.ExitError
 	if !errors.As(err, &exitErr) {
 		t.Fatalf("assessment error = %v, want efficacy-threshold ExitError", err)

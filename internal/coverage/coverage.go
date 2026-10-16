@@ -30,7 +30,6 @@ import (
 
 	"github.com/kejne/gremlins/internal/log"
 
-	"github.com/kejne/gremlins/internal/configuration"
 	"github.com/kejne/gremlins/internal/gomodule"
 )
 
@@ -55,6 +54,13 @@ type Coverage struct {
 	integrationMode bool
 }
 
+// Settings contains the coverage-specific options resolved by the CLI.
+type Settings struct {
+	BuildTags       string
+	CoverPkg        string
+	IntegrationMode bool
+}
+
 // Option for the Coverage initialization.
 type Option func(c *Coverage) *Coverage
 
@@ -62,25 +68,21 @@ type execContext = func(name string, args ...string) *exec.Cmd
 
 // New instantiates a Coverage element using exec.Command as execContext,
 // actually running the command on the OS.
-func New(workdir string, mod gomodule.GoModule, opts ...Option) *Coverage {
-	return NewWithCmd(exec.Command, workdir, mod, opts...)
+func New(workdir string, mod gomodule.GoModule, settings Settings, opts ...Option) *Coverage {
+	return NewWithCmd(exec.Command, workdir, mod, settings, opts...)
 }
 
 // NewWithCmd instantiates a Coverage element given a custom execContext.
-func NewWithCmd(cmdContext execContext, workdir string, mod gomodule.GoModule, opts ...Option) *Coverage {
-	buildTags := configuration.Get[string](configuration.UnleashTagsKey)
-	coverPkg := configuration.Get[string](configuration.UnleashCoverPkgKey)
-	integrationMode := configuration.Get[bool](configuration.UnleashIntegrationMode)
-
+func NewWithCmd(cmdContext execContext, workdir string, mod gomodule.GoModule, settings Settings, opts ...Option) *Coverage {
 	c := &Coverage{
 		cmdContext:      cmdContext,
 		workDir:         workdir,
 		path:            "./...",
 		fileName:        "coverage",
 		mod:             mod,
-		buildTags:       buildTags,
-		coverPkg:        coverPkg,
-		integrationMode: integrationMode,
+		buildTags:       settings.BuildTags,
+		coverPkg:        settings.CoverPkg,
+		integrationMode: settings.IntegrationMode,
 	}
 	for _, opt := range opts {
 		c = opt(c)

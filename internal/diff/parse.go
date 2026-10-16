@@ -7,13 +7,12 @@ import (
 
 	"github.com/bluekeyes/go-gitdiff/gitdiff"
 
-	"github.com/kejne/gremlins/internal/configuration"
 	"github.com/kejne/gremlins/internal/log"
 )
 
 // New creates a new Diff by parsing git diff output using the default command executor.
-func New() (Diff, error) {
-	return NewWithCmd(exec.Command)
+func New(diffRef string) (Diff, error) {
+	return NewWithCmd(exec.Command, diffRef)
 }
 
 type execCmd interface {
@@ -22,8 +21,7 @@ type execCmd interface {
 
 // NewWithCmd creates a new Diff by parsing git diff output using a custom command executor.
 // This is useful for testing.
-func NewWithCmd[T execCmd](cmdContext func(name string, args ...string) T) (Diff, error) {
-	diffRef := configuration.Get[string](configuration.UnleashDiffRef)
+func NewWithCmd[T execCmd](cmdContext func(name string, args ...string) T, diffRef string) (Diff, error) {
 	if diffRef == "" {
 		return nil, nil
 	}

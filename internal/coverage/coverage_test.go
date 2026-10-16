@@ -89,7 +89,7 @@ func TestCoverageRun(t *testing.T) {
 				Root:       ".",
 				CallingDir: tc.callPath,
 			}
-			cov := coverage.NewWithCmd(fakeExecCommandSuccess(holder), wantWorkdir, mod)
+			cov := coverage.NewWithCmd(fakeExecCommandSuccess(holder), wantWorkdir, mod, coverage.Settings{BuildTags: "tag1 tag2", CoverPkg: coverpkg, IntegrationMode: tc.intMode})
 
 			_, _ = cov.Run()
 
@@ -120,14 +120,14 @@ func TestCoverageRunFails(t *testing.T) {
 	}
 
 	t.Run("failure of: go mod download", func(t *testing.T) {
-		cov := coverage.NewWithCmd(fakeExecCommandFailure(0), "workdir", mod)
+		cov := coverage.NewWithCmd(fakeExecCommandFailure(0), "workdir", mod, coverage.Settings{})
 		if _, err := cov.Run(); err == nil {
 			t.Error("expected run to report an error")
 		}
 	})
 
 	t.Run("failure of: go test", func(t *testing.T) {
-		cov := coverage.NewWithCmd(fakeExecCommandFailure(1), "workdir", mod)
+		cov := coverage.NewWithCmd(fakeExecCommandFailure(1), "workdir", mod, coverage.Settings{})
 		if _, err := cov.Run(); err == nil {
 			t.Error("expected run to report an error")
 		}
@@ -140,7 +140,7 @@ func TestCoverageParsesOutput(t *testing.T) {
 		Name:       module,
 		CallingDir: "path",
 	}
-	cov := coverage.NewWithCmd(fakeExecCommandSuccess(nil), "testdata/valid", mod)
+	cov := coverage.NewWithCmd(fakeExecCommandSuccess(nil), "testdata/valid", mod, coverage.Settings{})
 	profile := coverage.Profile{
 		"file1.go": {
 			{
@@ -181,7 +181,7 @@ func TestParseOutputFail(t *testing.T) {
 		Name:       "example.com",
 		CallingDir: "./...",
 	}
-	cov := coverage.NewWithCmd(fakeExecCommandSuccess(nil), "testdata/invalid", mod)
+	cov := coverage.NewWithCmd(fakeExecCommandSuccess(nil), "testdata/invalid", mod, coverage.Settings{})
 
 	if _, err := cov.Run(); err == nil {
 		t.Errorf("espected an error")

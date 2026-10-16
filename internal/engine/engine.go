@@ -37,7 +37,6 @@ import (
 	"github.com/kejne/gremlins/internal/mutator"
 	"github.com/kejne/gremlins/internal/report"
 
-	"github.com/kejne/gremlins/internal/configuration"
 	"github.com/kejne/gremlins/internal/gomodule"
 )
 
@@ -46,11 +45,20 @@ import (
 // It traverses the AST of the project, finds which TokenMutator can be applied and
 // performs the actual mutation testing.
 type Engine struct {
-	fs       fs.FS
-	jDealer  ExecutorDealer
-	codeData CodeData
-	module   gomodule.GoModule
-	logger   report.MutantLogger
+	fs           fs.FS
+	jDealer      ExecutorDealer
+	codeData     CodeData
+	module       gomodule.GoModule
+	logger       report.MutantLogger
+	settings     Settings
+	poolSettings workerpool.Settings
+}
+
+// Settings contains mutation-discovery options resolved by the CLI.
+type Settings struct {
+	EnabledMutators map[mutator.Type]bool
+	Workers         int
+	IntegrationMode bool
 }
 
 // CodeData is used to check if the mutant should be executed.
@@ -67,20 +75,31 @@ type Option func(m Engine) Engine
 //
 // It gets a fs.FS on which to perform the analysis, a CodeData to
 // check if the mutants are executable and a sets of Option.
-func New(mod gomodule.GoModule, codeData CodeData, jDealer ExecutorDealer, opts ...Option) Engine {
+func New(mod gomodule.GoModule, codeData CodeData, jDealer ExecutorDealer, settings Settings, opts ...Option) Engine {
 	dirFS := os.DirFS(filepath.Join(mod.Root, mod.CallingDir))
 	mut := Engine{
-		module:   mod,
-		jDealer:  jDealer,
-		codeData: codeData,
-		fs:       dirFS,
-		logger:   report.NewLogger(),
+		module:       mod,
+		jDealer:      jDealer,
+		codeData:     codeData,
+		fs:           dirFS,
+		logger:       report.MutantLogger{},
+		settings:     settings,
+		poolSettings: workerpool.Settings{Workers: settings.Workers, IntegrationMode: settings.IntegrationMode},
 	}
 	for _, opt := range opts {
 		mut = opt(mut)
 	}
 
 	return mut
+}
+
+// WithLogger sets the configured mutation progress logger.
+func WithLogger(logger report.MutantLogger) Option {
+	return func(m Engine) Engine {
+		m.logger = logger
+
+		return m
+	}
 }
 
 // WithDirFs overrides the fs.FS of the module (mainly used for testing purposes).
@@ -176,7 +195,7 @@ func (mu *Engine) findMutations(fileName string, set *token.FileSet, file *ast.F
 	pkg := mu.pkgName(fileName, file.Name.Name)
 	var mutants []mutator.Mutator
 	for _, mt := range mutantTypes {
-		if !configuration.Get[bool](configuration.MutantTypeEnabledKey(mt)) {
+		if !mu.settings.EnabledMutators[mt] {
 			continue
 		}
 		mutantType := mt
@@ -233,7 +252,7 @@ func (mu *Engine) mutationStatus(pos token.Position) mutator.Status {
 }
 
 func (mu *Engine) executeTests(ctx context.Context, discovered []mutator.Mutator) report.Results {
-	pool := workerpool.Initialize("mutator")
+	pool := workerpool.Initialize("mutator", mu.poolSettings)
 	pool.Start()
 
 	var mutants []mutator.Mutator

@@ -4,22 +4,16 @@ package exclusion
 import (
 	"fmt"
 	"regexp"
-
-	"github.com/spf13/viper"
-
-	"github.com/kejne/gremlins/internal/configuration"
 )
 
 // Rules represents a collection of regex patterns for file exclusion.
 type Rules []*regexp.Regexp
 
-// New creates exclusion rules from the configuration.
-func New() (Rules, error) {
+// New creates exclusion rules from the provided patterns.
+func New(patterns []string) (Rules, error) {
 	var rules Rules
 
-	// TODO: modify and use configuration package
-	// NOTE: configuration.Get can't type cast to []string a value from .gremlins file, because viper.Get(k) returns []interface{}
-	flagValues := viper.GetStringSlice(configuration.UnleashExcludeFiles)
+	flagValues := patterns
 
 	for i, s := range flagValues {
 		r, err := regexp.Compile(s)

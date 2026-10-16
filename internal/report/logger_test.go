@@ -128,19 +128,19 @@ func TestLogger(t *testing.T) {
 	m := stubMutant{status: mutator.NotCovered, mutantType: mutator.ConditionalsBoundary, position: fakePosition}
 
 	configuration.Set(configuration.UnleashOutputStatusesKey, "lp")
-	logger := report.NewLogger() // prints error
+	logger := report.NewLogger(report.LoggerSettings{OutputStatuses: configuration.Get[string](configuration.UnleashOutputStatusesKey), OutputDiffStatuses: configuration.Get[string](configuration.UnleashOutputDiffStatusesKey)}) // prints error
 
 	logger.Mutant(m) // prints Not covered because no filter
 
 	m.status = mutator.Killed
 
 	configuration.Set(configuration.UnleashOutputStatusesKey, "")
-	logger = report.NewLogger()
+	logger = report.NewLogger(report.LoggerSettings{OutputStatuses: configuration.Get[string](configuration.UnleashOutputStatusesKey), OutputDiffStatuses: configuration.Get[string](configuration.UnleashOutputDiffStatusesKey)})
 
 	logger.Mutant(m) // prints Killed because no filter
 
 	configuration.Set(configuration.UnleashOutputStatusesKey, "l")
-	logger = report.NewLogger()
+	logger = report.NewLogger(report.LoggerSettings{OutputStatuses: configuration.Get[string](configuration.UnleashOutputStatusesKey), OutputDiffStatuses: configuration.Get[string](configuration.UnleashOutputDiffStatusesKey)})
 
 	logger.Mutant(m) // Killed filtered
 
@@ -171,7 +171,7 @@ func TestLoggerOutputStatusesAndDiffStatusesTogether(t *testing.T) {
 		configuration.Set(configuration.UnleashOutputDiffStatusesKey, "l")
 		defer configuration.Reset()
 
-		logger := report.NewLogger()
+		logger := report.NewLogger(report.LoggerSettings{OutputStatuses: configuration.Get[string](configuration.UnleashOutputStatusesKey), OutputDiffStatuses: configuration.Get[string](configuration.UnleashOutputDiffStatusesKey)})
 		logger.Mutant(stubMutant{
 			status:         mutator.Lived,
 			mutantType:     mutator.ConditionalsBoundary,
@@ -197,7 +197,7 @@ func TestLoggerOutputStatusesAndDiffStatusesTogether(t *testing.T) {
 		configuration.Set(configuration.UnleashOutputDiffStatusesKey, "k")
 		defer configuration.Reset()
 
-		logger := report.NewLogger()
+		logger := report.NewLogger(report.LoggerSettings{OutputStatuses: configuration.Get[string](configuration.UnleashOutputStatusesKey), OutputDiffStatuses: configuration.Get[string](configuration.UnleashOutputDiffStatusesKey)})
 		logger.Mutant(stubMutant{
 			status:         mutator.Killed,
 			mutantType:     mutator.ConditionalsBoundary,
@@ -234,7 +234,7 @@ func TestLoggerOutputDiffStatuses(t *testing.T) {
 		configuration.Set(configuration.UnleashOutputDiffStatusesKey, "l")
 		defer configuration.Reset()
 
-		logger := report.NewLogger()
+		logger := report.NewLogger(report.LoggerSettings{OutputStatuses: configuration.Get[string](configuration.UnleashOutputStatusesKey), OutputDiffStatuses: configuration.Get[string](configuration.UnleashOutputDiffStatusesKey)})
 		logger.Mutant(livedWithSnippets)
 
 		got := out.String()
@@ -253,7 +253,7 @@ func TestLoggerOutputDiffStatuses(t *testing.T) {
 		configuration.Set(configuration.UnleashOutputDiffStatusesKey, "k")
 		defer configuration.Reset()
 
-		logger := report.NewLogger()
+		logger := report.NewLogger(report.LoggerSettings{OutputStatuses: configuration.Get[string](configuration.UnleashOutputStatusesKey), OutputDiffStatuses: configuration.Get[string](configuration.UnleashOutputDiffStatusesKey)})
 		logger.Mutant(livedWithSnippets)
 
 		got := out.String()
@@ -267,7 +267,7 @@ func TestLoggerOutputDiffStatuses(t *testing.T) {
 		log.Init(out, &bytes.Buffer{})
 		defer log.Reset()
 
-		logger := report.NewLogger()
+		logger := report.NewLogger(report.LoggerSettings{OutputStatuses: configuration.Get[string](configuration.UnleashOutputStatusesKey), OutputDiffStatuses: configuration.Get[string](configuration.UnleashOutputDiffStatusesKey)})
 		logger.Mutant(livedWithSnippets)
 
 		got := out.String()
@@ -275,4 +275,22 @@ func TestLoggerOutputDiffStatuses(t *testing.T) {
 			t.Errorf("expected only status line, got: %q", got)
 		}
 	})
+}
+
+func reportSettingsForTest() report.Settings {
+	efficacy := configuration.Get[float64](configuration.UnleashThresholdEfficacyKey)
+	if efficacy == 0 {
+		efficacy = float64(configuration.Get[int](configuration.UnleashThresholdEfficacyKey))
+	}
+	coverage := configuration.Get[float64](configuration.UnleashThresholdMCoverageKey)
+	if coverage == 0 {
+		coverage = float64(configuration.Get[int](configuration.UnleashThresholdMCoverageKey))
+	}
+
+	return report.Settings{
+		DryRun:                  configuration.Get[bool](configuration.UnleashDryRunKey),
+		Output:                  configuration.Get[string](configuration.UnleashOutputKey),
+		ThresholdEfficacy:       efficacy,
+		ThresholdMutantCoverage: coverage,
+	}
 }

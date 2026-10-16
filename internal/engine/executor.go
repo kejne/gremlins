@@ -26,7 +26,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kejne/gremlins/internal/configuration"
 	"github.com/kejne/gremlins/internal/engine/workdir"
 	"github.com/kejne/gremlins/internal/engine/workerpool"
 	"github.com/kejne/gremlins/internal/gomodule"
@@ -41,6 +40,15 @@ const DefaultTimeoutCoefficient = 5
 // ExecutorDealer is the initializer for new workerpool.Executor.
 type ExecutorDealer interface {
 	NewExecutor(mut mutator.Mutator, outCh chan<- mutator.Mutator, wg *sync.WaitGroup) workerpool.Executor
+}
+
+// ExecutorSettings contains options used to execute mutant tests.
+type ExecutorSettings struct {
+	BuildTags          string
+	DryRun             bool
+	IntegrationMode    bool
+	TestCPU            int
+	TimeoutCoefficient int
 }
 
 // MutantExecutorDealer is a ExecutorDealer for the initialisation of a mutantExecutor.
@@ -75,12 +83,12 @@ func WithExecContext(c execContext) ExecutorDealerOption {
 }
 
 // NewExecutorDealer initialises a MutantExecutorDealer.
-func NewExecutorDealer(mod gomodule.GoModule, wdd workdir.Dealer, elapsed time.Duration, opts ...ExecutorDealerOption) *MutantExecutorDealer {
-	buildTags := configuration.Get[string](configuration.UnleashTagsKey)
-	dryRun := configuration.Get[bool](configuration.UnleashDryRunKey)
-	integrationMode := configuration.Get[bool](configuration.UnleashIntegrationMode)
-	testCPU := configuration.Get[int](configuration.UnleashTestCPUKey)
-	tCoefficient := configuration.Get[int](configuration.UnleashTimeoutCoefficientKey)
+func NewExecutorDealer(mod gomodule.GoModule, wdd workdir.Dealer, elapsed time.Duration, settings ExecutorSettings, opts ...ExecutorDealerOption) *MutantExecutorDealer {
+	buildTags := settings.BuildTags
+	dryRun := settings.DryRun
+	integrationMode := settings.IntegrationMode
+	testCPU := settings.TestCPU
+	tCoefficient := settings.TimeoutCoefficient
 
 	coefficient := DefaultTimeoutCoefficient
 	if tCoefficient != 0 {

@@ -27,6 +27,7 @@ import (
 	"testing/fstest"
 
 	"github.com/kejne/gremlins/internal/configuration"
+	"github.com/kejne/gremlins/internal/engine"
 	"github.com/kejne/gremlins/internal/engine/workerpool"
 	"github.com/kejne/gremlins/internal/gomodule"
 	"github.com/kejne/gremlins/internal/mutator"
@@ -52,6 +53,15 @@ func viperReset() {
 		configuration.Set(configuration.MutantTypeEnabledKey(mt), true)
 	}
 	viperMutex.Unlock()
+}
+
+func enabledMutatorsForTest() map[mutator.Type]bool {
+	enabled := make(map[mutator.Type]bool, len(mutator.Types))
+	for _, mt := range mutator.Types {
+		enabled[mt] = configuration.Get[bool](configuration.MutantTypeEnabledKey(mt))
+	}
+
+	return enabled
 }
 
 func loadFixture(fixture, fromPackage string) (fstest.MapFS, gomodule.GoModule, func()) {
@@ -199,4 +209,14 @@ func (*mutantStub) OrigSnippet() []byte {
 
 func (*mutantStub) MutatedSnippet() []byte {
 	return nil
+}
+
+func executorSettingsForTest() engine.ExecutorSettings {
+	return engine.ExecutorSettings{
+		BuildTags:          configuration.Get[string](configuration.UnleashTagsKey),
+		DryRun:             configuration.Get[bool](configuration.UnleashDryRunKey),
+		IntegrationMode:    configuration.Get[bool](configuration.UnleashIntegrationMode),
+		TestCPU:            configuration.Get[int](configuration.UnleashTestCPUKey),
+		TimeoutCoefficient: configuration.Get[int](configuration.UnleashTimeoutCoefficientKey),
+	}
 }

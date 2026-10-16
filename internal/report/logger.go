@@ -4,7 +4,6 @@ package report
 import (
 	"errors"
 
-	"github.com/kejne/gremlins/internal/configuration"
 	"github.com/kejne/gremlins/internal/log"
 	"github.com/kejne/gremlins/internal/mutator"
 )
@@ -24,15 +23,21 @@ type MutantLogger struct {
 	DiffFilter Filter
 }
 
-// NewLogger creates a new MutantLogger with filters from configuration.
-func NewLogger() MutantLogger {
-	outputStatuses := configuration.Get[string](configuration.UnleashOutputStatusesKey)
+// LoggerSettings contains mutation log filters resolved by the CLI.
+type LoggerSettings struct {
+	OutputStatuses     string
+	OutputDiffStatuses string
+}
+
+// NewLogger creates a new MutantLogger with the provided filters.
+func NewLogger(settings LoggerSettings) MutantLogger {
+	outputStatuses := settings.OutputStatuses
 	f, err := ParseFilter(outputStatuses)
 	if err != nil {
 		log.Infof("output-statuses filter not applied: %s\n", err)
 	}
 
-	diffStatuses := configuration.Get[string](configuration.UnleashOutputDiffStatusesKey)
+	diffStatuses := settings.OutputDiffStatuses
 	df, err := ParseDiffFilter(diffStatuses)
 	if err != nil {
 		log.Infof("output-diff-statuses filter not applied: %s\n", err)

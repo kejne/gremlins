@@ -17,7 +17,7 @@ func TestRules_IsFileExcluded(t *testing.T) {
 		ss := []any{"test", "internal"}
 		configuration.Set(configuration.UnleashExcludeFiles, ss)
 
-		rules, err := New()
+		rules, err := New([]string{"test", "internal"})
 		if err != nil || countTrue(testPath, rules.IsFileExcluded) != 2 {
 			t.Error("must match 2 paths")
 		}
@@ -27,7 +27,7 @@ func TestRules_IsFileExcluded(t *testing.T) {
 		ss := []any{"test", "internal[[["}
 		configuration.Set(configuration.UnleashExcludeFiles, ss)
 
-		rules, err := New()
+		rules, err := New([]string{"test", "internal[[["})
 		if err == nil || rules != nil {
 			t.Error("must return error")
 		}
@@ -36,7 +36,7 @@ func TestRules_IsFileExcluded(t *testing.T) {
 	t.Run("no rules", func(t *testing.T) {
 		configuration.Set(configuration.UnleashExcludeFiles, []string(nil))
 
-		rules, err := New()
+		rules, err := New(nil)
 		if err != nil || len(rules) != 0 {
 			t.Error("must return empty rules")
 		}

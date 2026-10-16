@@ -116,7 +116,7 @@ func TestReport(t *testing.T) {
 				Elapsed: (2 * time.Minute) + (22 * time.Second) + (123 * time.Millisecond),
 			}
 
-			_ = report.Do(data)
+			_ = report.Do(data, reportSettingsForTest())
 
 			got := out.String()
 
@@ -170,7 +170,7 @@ func TestReport(t *testing.T) {
 				Elapsed: (2 * time.Minute) + (22 * time.Second) + (123 * time.Millisecond),
 			}
 
-			_ = report.Do(data)
+			_ = report.Do(data, reportSettingsForTest())
 
 			got := out.String()
 
@@ -272,7 +272,7 @@ func TestAssessment(t *testing.T) {
 				Elapsed: 1 * time.Minute,
 			}
 
-			err := report.Do(data)
+			err := report.Do(data, reportSettingsForTest())
 
 			if tc.expectError && err == nil {
 				t.Fatal("expected an error")
@@ -306,7 +306,7 @@ func TestAssessmentWithOnlySkippedMutants(t *testing.T) {
 		Elapsed: time.Minute,
 	}
 
-	if err := report.Do(data); err != nil {
+	if err := report.Do(data, reportSettingsForTest()); err != nil {
 		t.Fatalf("thresholds should not fail when --diff has no applicable mutants: %v", err)
 	}
 }
@@ -495,7 +495,7 @@ func TestReportToFile(t *testing.T) {
 		viper.Set(configuration.UnleashOutputKey, output)
 		defer viper.Reset()
 
-		if err := report.Do(data); err != nil {
+		if err := report.Do(data, reportSettingsForTest()); err != nil {
 			t.Fatal("error not expected")
 		}
 
@@ -520,7 +520,7 @@ func TestReportToFile(t *testing.T) {
 		outDir := t.TempDir()
 		output := filepath.Join(outDir, outFile)
 
-		if err := report.Do(data); err != nil {
+		if err := report.Do(data, reportSettingsForTest()); err != nil {
 			t.Fatal("error not expected")
 		}
 
@@ -539,7 +539,7 @@ func TestReportToFile(t *testing.T) {
 		viper.Set(configuration.UnleashOutputKey, output)
 		defer viper.Reset()
 
-		if err := report.Do(data); err != nil {
+		if err := report.Do(data, reportSettingsForTest()); err != nil {
 			t.Fatal("error not expected")
 		}
 

@@ -14,7 +14,7 @@ func TestNewWithCmd(t *testing.T) {
 	t.Run("must return nil on empty flag", func(t *testing.T) {
 		m := &mock{}
 
-		d, err := NewWithCmd(m.call)
+		d, err := NewWithCmd(m.call, configuration.Get[string](configuration.UnleashDiffRef))
 
 		if d != nil && err != nil {
 			t.Fatal("incorrect result")
@@ -28,7 +28,7 @@ func TestNewWithCmd(t *testing.T) {
 			outputErr: errors.New("test"),
 		}
 
-		_, err := NewWithCmd(m.call)
+		_, err := NewWithCmd(m.call, configuration.Get[string](configuration.UnleashDiffRef))
 		if err == nil {
 			t.Error("must return error")
 		}
@@ -53,7 +53,7 @@ func TestNewWithCmd(t *testing.T) {
 			output: []byte(testErrDiff),
 		}
 
-		_, err := NewWithCmd(m.call)
+		_, err := NewWithCmd(m.call, configuration.Get[string](configuration.UnleashDiffRef))
 		if err == nil {
 			t.Error("must return error")
 		}
@@ -70,7 +70,7 @@ func TestNewWithCmd(t *testing.T) {
 			"test/test": {{StartLine: 44, EndLine: 44}},
 		}
 
-		result, err := NewWithCmd(m.call)
+		result, err := NewWithCmd(m.call, configuration.Get[string](configuration.UnleashDiffRef))
 
 		if err != nil || !reflect.DeepEqual(result, expected) {
 			t.Log("err", err)

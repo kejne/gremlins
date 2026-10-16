@@ -75,7 +75,7 @@ func TestPool(t *testing.T) {
 
 		outCh := make(chan mutator.Mutator)
 
-		pool := workerpool.Initialize("test")
+		pool := workerpool.Initialize("test", workerpool.Settings{Workers: 1})
 		pool.Start()
 		defer pool.Stop()
 
@@ -104,7 +104,7 @@ func TestPool(t *testing.T) {
 		configuration.Set(configuration.UnleashWorkersKey, 0)
 		defer configuration.Reset()
 
-		pool := workerpool.Initialize("test")
+		pool := workerpool.Initialize("test", workerpool.Settings{Workers: 0})
 		pool.Start()
 		defer pool.Stop()
 
@@ -118,7 +118,7 @@ func TestPool(t *testing.T) {
 		configuration.Set(configuration.UnleashIntegrationMode, true)
 		defer configuration.Reset()
 
-		pool := workerpool.Initialize("test")
+		pool := workerpool.Initialize("test", workerpool.Settings{Workers: 0, IntegrationMode: true})
 		pool.Start()
 		defer pool.Stop()
 
@@ -131,7 +131,7 @@ func TestPool(t *testing.T) {
 		configuration.Set(configuration.UnleashWorkersKey, 3)
 		defer configuration.Reset()
 
-		pool := workerpool.Initialize("test")
+		pool := workerpool.Initialize("test", workerpool.Settings{Workers: 3})
 		pool.Start()
 		defer pool.Stop()
 
@@ -145,7 +145,7 @@ func TestPool(t *testing.T) {
 		configuration.Set(configuration.UnleashIntegrationMode, true)
 		defer configuration.Reset()
 
-		pool := workerpool.Initialize("test")
+		pool := workerpool.Initialize("test", workerpool.Settings{Workers: 2, IntegrationMode: true})
 		pool.Start()
 		defer pool.Stop()
 

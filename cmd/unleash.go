@@ -27,6 +27,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 
 	"github.com/kejne/gremlins/cmd/internal/flags"
 	"github.com/kejne/gremlins/internal/configuration"
@@ -120,12 +121,13 @@ func runUnleash(ctx context.Context) func(cmd *cobra.Command, args []string) err
 		}
 		defer cleanUp(workDir)
 
+		settings := resolveRunSettings()
 		wg := &sync.WaitGroup{}
 		wg.Add(1)
 		cancelled := false
 		var results report.Results
 		go runWithCancel(ctx, wg, func(c context.Context) {
-			results, err = run(c, mod, workDir)
+			results, err = run(c, mod, workDir, settings.coverage, settings.engine, settings.executor, settings.logger, settings.diffRef, settings.exclusions)
 		}, func() {
 			cancelled = true
 		})
@@ -137,7 +139,7 @@ func runUnleash(ctx context.Context) func(cmd *cobra.Command, args []string) err
 			return err
 		}
 
-		return report.Do(results)
+		return report.Do(results, settings.report)
 	}
 }
 
@@ -159,15 +161,61 @@ func cleanUp(wd string) {
 	}
 }
 
-func run(ctx context.Context, mod gomodule.GoModule, workDir string) (report.Results, error) {
-	fDiff, err := diff.New()
+type runSettings struct {
+	coverage   coverage.Settings
+	engine     engine.Settings
+	executor   engine.ExecutorSettings
+	report     report.Settings
+	logger     report.LoggerSettings
+	diffRef    string
+	exclusions []string
+}
+
+func threshold(key string) float64 {
+	value := configuration.Get[float64](key)
+	if value == 0 {
+		value = float64(configuration.Get[int](key))
+	}
+
+	return value
+}
+
+func resolveRunSettings() runSettings {
+	integration := configuration.Get[bool](configuration.UnleashIntegrationMode)
+	buildTags := configuration.Get[string](configuration.UnleashTagsKey)
+	dryRun := configuration.Get[bool](configuration.UnleashDryRunKey)
+	thresholdEfficacy := threshold(configuration.UnleashThresholdEfficacyKey)
+	thresholdCoverage := threshold(configuration.UnleashThresholdMCoverageKey)
+	enabled := make(map[mutator.Type]bool)
+	for _, typ := range mutator.Types {
+		key := configuration.MutantTypeEnabledKey(typ)
+		if viper.IsSet(key) {
+			enabled[typ] = configuration.Get[bool](key)
+		} else {
+			enabled[typ] = configuration.IsDefaultEnabled(typ)
+		}
+	}
+
+	return runSettings{
+		coverage:   coverage.Settings{BuildTags: buildTags, CoverPkg: configuration.Get[string](configuration.UnleashCoverPkgKey), IntegrationMode: integration},
+		engine:     engine.Settings{EnabledMutators: enabled, Workers: configuration.Get[int](configuration.UnleashWorkersKey), IntegrationMode: integration},
+		executor:   engine.ExecutorSettings{BuildTags: buildTags, DryRun: dryRun, IntegrationMode: integration, TestCPU: configuration.Get[int](configuration.UnleashTestCPUKey), TimeoutCoefficient: configuration.Get[int](configuration.UnleashTimeoutCoefficientKey)},
+		report:     report.Settings{DryRun: dryRun, Output: configuration.Get[string](configuration.UnleashOutputKey), ThresholdEfficacy: thresholdEfficacy, ThresholdMutantCoverage: thresholdCoverage},
+		logger:     report.LoggerSettings{OutputStatuses: configuration.Get[string](configuration.UnleashOutputStatusesKey), OutputDiffStatuses: configuration.Get[string](configuration.UnleashOutputDiffStatusesKey)},
+		diffRef:    configuration.Get[string](configuration.UnleashDiffRef),
+		exclusions: viper.GetStringSlice(configuration.UnleashExcludeFiles),
+	}
+}
+
+func run(ctx context.Context, mod gomodule.GoModule, workDir string, coverageSettings coverage.Settings, engineSettings engine.Settings, executorSettings engine.ExecutorSettings, loggerSettings report.LoggerSettings, diffRef string, exclusionPatterns []string) (report.Results, error) {
+	fDiff, err := diff.New(diffRef)
 	if err != nil {
 		return report.Results{}, err
 	}
 
-	c := coverage.New(workDir, mod)
+	c := coverage.New(workDir, mod, coverageSettings)
 
-	exclude, err := exclusion.New()
+	exclude, err := exclusion.New(exclusionPatterns)
 	if err != nil {
 		return report.Results{}, err
 	}
@@ -180,7 +228,7 @@ func run(ctx context.Context, mod gomodule.GoModule, workDir string) (report.Res
 	wdDealer := workdir.NewCachedDealer(workDir, mod.Root)
 	defer wdDealer.Clean()
 
-	jDealer := engine.NewExecutorDealer(mod, wdDealer, cProfile.Elapsed)
+	jDealer := engine.NewExecutorDealer(mod, wdDealer, cProfile.Elapsed, executorSettings)
 
 	codeData := engine.CodeData{
 		Cov:       cProfile.Profile,
@@ -188,7 +236,7 @@ func run(ctx context.Context, mod gomodule.GoModule, workDir string) (report.Res
 		Exclusion: exclude,
 	}
 
-	mut := engine.New(mod, codeData, jDealer)
+	mut := engine.New(mod, codeData, jDealer, engineSettings, engine.WithLogger(report.NewLogger(loggerSettings)))
 	results, err := mut.Run(ctx)
 	if err != nil {
 		return report.Results{}, err
