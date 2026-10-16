@@ -56,6 +56,7 @@ func (gc gremlinsCmd) execute() error {
 			log.Errorf("initialization error: %s\n", err)
 			os.Exit(1)
 		}
+		log.SetSilent(configuration.Get[bool](configuration.GremlinsSilentKey))
 	})
 	gc.cmd.PersistentFlags().StringVar(&cfgFile, paramConfigFile, "", "override config file")
 

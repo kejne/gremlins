@@ -20,8 +20,6 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/spf13/viper"
-
 	"github.com/kejne/gremlins/internal/log"
 )
 
@@ -118,14 +116,12 @@ func TestLogError(t *testing.T) {
 }
 
 func TestSilentMode(t *testing.T) {
-	viper.Set("silent", true)
-	defer viper.Reset()
-
 	sOut := &bytes.Buffer{}
 	defer sOut.Reset()
 	eOut := &bytes.Buffer{}
 	defer eOut.Reset()
 	log.Init(sOut, eOut)
+	log.SetSilent(true)
 	defer log.Reset()
 
 	log.Infof("%s", "test")

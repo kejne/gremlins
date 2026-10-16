@@ -23,8 +23,6 @@ import (
 	"sync"
 
 	"github.com/fatih/color"
-
-	"github.com/kejne/gremlins/internal/configuration"
 )
 
 var fgRed = color.New(color.FgRed).SprintFunc()
@@ -91,19 +89,27 @@ func Errorln(a any) {
 }
 
 type log struct {
-	out  io.Writer
-	eOut io.Writer
+	out    io.Writer
+	eOut   io.Writer
+	silent bool
+}
+
+// SetSilent suppresses informational output while preserving error messages.
+func SetSilent(silent bool) {
+	if instance != nil {
+		instance.silent = silent
+	}
 }
 
 func (l *log) writef(f string, args ...any) {
-	if configuration.Get[bool]("silent") {
+	if l.silent {
 		return
 	}
 	_, _ = fmt.Fprintf(l.out, f, args...)
 }
 
 func (l *log) writeln(a any) {
-	if configuration.Get[bool]("silent") {
+	if l.silent {
 		return
 	}
 	_, _ = fmt.Fprintln(l.out, a)
