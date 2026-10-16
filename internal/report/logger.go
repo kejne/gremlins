@@ -6,6 +6,7 @@ import (
 
 	"github.com/kejne/gremlins/internal/log"
 	"github.com/kejne/gremlins/internal/mutator"
+	"github.com/kejne/gremlins/internal/results"
 )
 
 // Filter maps mutation statuses to filter which mutants are logged.
@@ -51,16 +52,21 @@ func NewLogger(settings LoggerSettings) MutantLogger {
 
 // Mutant logs a mutant if it passes the filter, then optionally prints the diff.
 func (l MutantLogger) Mutant(m mutator.Mutator) {
+	l.Outcome(results.Snapshot(m))
+}
+
+// Outcome logs a completed mutation outcome if it passes the configured filters.
+func (l MutantLogger) Outcome(outcome results.Outcome) {
 	if l.Filter != nil {
-		if _, ok := l.Filter[m.Status()]; !ok {
+		if _, ok := l.Filter[outcome.Status]; !ok {
 			return
 		}
 	}
 
-	Mutant(m)
+	MutantOutcome(outcome)
 
-	if _, ok := l.DiffFilter[m.Status()]; ok {
-		MutantDiff(m)
+	if _, ok := l.DiffFilter[outcome.Status]; ok {
+		MutantOutcomeDiff(outcome)
 	}
 }
 

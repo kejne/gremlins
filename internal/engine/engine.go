@@ -27,15 +27,13 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/kejne/gremlins/internal/coverage"
 	"github.com/kejne/gremlins/internal/diff"
-	"github.com/kejne/gremlins/internal/engine/workerpool"
 	"github.com/kejne/gremlins/internal/exclusion"
+	"github.com/kejne/gremlins/internal/execution"
 	"github.com/kejne/gremlins/internal/mutator"
-	"github.com/kejne/gremlins/internal/report"
 	"github.com/kejne/gremlins/internal/results"
 
 	"github.com/kejne/gremlins/internal/gomodule"
@@ -46,13 +44,12 @@ import (
 // It traverses the AST of the project, finds which TokenMutator can be applied and
 // performs the actual mutation testing.
 type Engine struct {
-	fs           fs.FS
-	jDealer      ExecutorDealer
-	codeData     CodeData
-	module       gomodule.GoModule
-	logger       report.MutantLogger
-	settings     Settings
-	poolSettings workerpool.Settings
+	fs       fs.FS
+	jDealer  execution.ExecutorDealer
+	codeData CodeData
+	module   gomodule.GoModule
+	progress func(results.Outcome)
+	settings Settings
 }
 
 // Settings contains mutation-discovery options resolved by the CLI.
@@ -76,16 +73,14 @@ type Option func(m Engine) Engine
 //
 // It gets a fs.FS on which to perform the analysis, a CodeData to
 // check if the mutants are executable and a sets of Option.
-func New(mod gomodule.GoModule, codeData CodeData, jDealer ExecutorDealer, settings Settings, opts ...Option) Engine {
+func New(mod gomodule.GoModule, codeData CodeData, jDealer execution.ExecutorDealer, settings Settings, opts ...Option) Engine {
 	dirFS := os.DirFS(filepath.Join(mod.Root, mod.CallingDir))
 	mut := Engine{
-		module:       mod,
-		jDealer:      jDealer,
-		codeData:     codeData,
-		fs:           dirFS,
-		logger:       report.MutantLogger{},
-		settings:     settings,
-		poolSettings: workerpool.Settings{Workers: settings.Workers, IntegrationMode: settings.IntegrationMode},
+		module:   mod,
+		jDealer:  jDealer,
+		codeData: codeData,
+		fs:       dirFS,
+		settings: settings,
 	}
 	for _, opt := range opts {
 		mut = opt(mut)
@@ -94,10 +89,10 @@ func New(mod gomodule.GoModule, codeData CodeData, jDealer ExecutorDealer, setti
 	return mut
 }
 
-// WithLogger sets the configured mutation progress logger.
-func WithLogger(logger report.MutantLogger) Option {
+// WithProgress sets a consumer for each completed mutation outcome.
+func WithProgress(consume func(results.Outcome)) Option {
 	return func(m Engine) Engine {
-		m.logger = logger
+		m.progress = consume
 
 		return m
 	}
@@ -253,54 +248,9 @@ func (mu *Engine) mutationStatus(pos token.Position) mutator.Status {
 }
 
 func (mu *Engine) executeTests(ctx context.Context, discovered []mutator.Mutator) results.Results {
-	pool := workerpool.Initialize("mutator", mu.poolSettings)
-	pool.Start()
+	completed := execution.RunMutations(ctx, discovered, mu.jDealer, execution.SchedulingSettings{
+		Workers: mu.settings.Workers, IntegrationMode: mu.settings.IntegrationMode,
+	}, mu.progress)
 
-	var mutants []mutator.Mutator
-	outCh := make(chan mutator.Mutator)
-	wg := &sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for _, mut := range discovered {
-			ok := checkDone(ctx)
-			if !ok {
-				pool.Stop()
-
-				break
-			}
-			wg.Add(1)
-			pool.AppendExecutor(mu.jDealer.NewExecutor(mut, outCh, wg))
-		}
-	}()
-
-	go func() {
-		wg.Wait()
-		close(outCh)
-	}()
-
-	for m := range outCh {
-		mu.logger.Mutant(m)
-		mutants = append(mutants, m)
-	}
-
-	return completedResults(mutants)
-}
-
-func checkDone(ctx context.Context) bool {
-	select {
-	case <-ctx.Done():
-		return false
-	default:
-		return true
-	}
-}
-
-func completedResults(m []mutator.Mutator) results.Results {
-	outcomes := make([]results.Outcome, 0, len(m))
-	for _, mutant := range m {
-		outcomes = append(outcomes, results.Snapshot(mutant))
-	}
-
-	return results.Results{Outcomes: outcomes}
+	return completed
 }

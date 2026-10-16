@@ -14,7 +14,7 @@
  *    limitations under the License.
  */
 
-package engine_test
+package execution
 
 import (
 	"context"
@@ -29,8 +29,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/kejne/gremlins/internal/configuration"
-	"github.com/kejne/gremlins/internal/engine"
-	"github.com/kejne/gremlins/internal/engine/workerpool"
+	"github.com/kejne/gremlins/internal/execution/workerpool"
 	"github.com/kejne/gremlins/internal/gomodule"
 	"github.com/kejne/gremlins/internal/mutator"
 )
@@ -44,7 +43,7 @@ func TestApplyAndRollback(t *testing.T) {
 			Root:       tmpDir,
 			CallingDir: ".",
 		}
-		mjd := engine.NewExecutorDealer(mod, wdDealer, expectedTimeout, executorSettingsForTest(), engine.WithExecContext(fakeExecCommandSuccess))
+		mjd := NewExecutorDealer(mod, wdDealer, expectedTimeout, executorSettingsForTest(), WithExecContext(fakeExecCommandSuccess))
 		mut := &mutantStub{
 			status:  mutator.Runnable,
 			mutType: mutator.ConditionalsBoundary,
@@ -84,7 +83,7 @@ func TestApplyAndRollback(t *testing.T) {
 			Root:       tmpDir,
 			CallingDir: ".",
 		}
-		mjd := engine.NewExecutorDealer(mod, wdDealer, expectedTimeout, executorSettingsForTest(), engine.WithExecContext(fakeExecCommandSuccess))
+		mjd := NewExecutorDealer(mod, wdDealer, expectedTimeout, executorSettingsForTest(), WithExecContext(fakeExecCommandSuccess))
 		mut := &mutantStub{
 			status:        mutator.Runnable,
 			mutType:       mutator.ConditionalsBoundary,
@@ -118,11 +117,11 @@ func TestApplyAndRollback(t *testing.T) {
 	})
 }
 
-type execContext = func(ctx context.Context, name string, args ...string) *exec.Cmd
+type testExecContext = func(ctx context.Context, name string, args ...string) *exec.Cmd
 
 func TestMutatorTestExecution(t *testing.T) {
 	testCases := []struct {
-		testResult    execContext
+		testResult    testExecContext
 		name          string
 		mutantStatus  mutator.Status
 		wantMutStatus mutator.Status
@@ -164,8 +163,8 @@ func TestMutatorTestExecution(t *testing.T) {
 				Root:       ".",
 				CallingDir: ".",
 			}
-			mjd := engine.NewExecutorDealer(mod, wdDealer, expectedTimeout, executorSettingsForTest(),
-				engine.WithExecContext(fakeExecCommandWithHolder(holder, tc.testResult)),
+			mjd := NewExecutorDealer(mod, wdDealer, expectedTimeout, executorSettingsForTest(),
+				WithExecContext(fakeExecCommandWithHolder(holder, tc.testResult)),
 			)
 			mut := &mutantStub{
 				status:  tc.mutantStatus,
@@ -282,8 +281,8 @@ func TestMutatorRun(t *testing.T) {
 			}
 			wdDealer := newWdDealerStub(t)
 			holder := &commandHolder{}
-			mjd := engine.NewExecutorDealer(mod, wdDealer, expectedTimeout, executorSettingsForTest(),
-				engine.WithExecContext(fakeExecCommandSuccessWithHolder(holder)))
+			mjd := NewExecutorDealer(mod, wdDealer, expectedTimeout, executorSettingsForTest(),
+				WithExecContext(fakeExecCommandSuccessWithHolder(holder)))
 			mut := &mutantStub{
 				status:  mutator.Runnable,
 				mutType: mutator.ConditionalsBoundary,
@@ -304,7 +303,7 @@ func TestMutatorRun(t *testing.T) {
 			executor.Start(w)
 			wg.Wait()
 
-			wantTimeout := 2*time.Second + expectedTimeout*engine.DefaultTimeoutCoefficient
+			wantTimeout := 2*time.Second + expectedTimeout*DefaultTimeoutCoefficient
 			if tc.timeoutCoefficient != 0 {
 				wantTimeout = 2*time.Second + expectedTimeout*time.Duration(tc.timeoutCoefficient)
 			}
@@ -371,8 +370,8 @@ func TestCPU(t *testing.T) {
 			}
 			wdDealer := newWdDealerStub(t)
 			holder := &commandHolder{}
-			mjd := engine.NewExecutorDealer(mod, wdDealer, expectedTimeout, executorSettingsForTest(),
-				engine.WithExecContext(fakeExecCommandSuccessWithHolder(holder)))
+			mjd := NewExecutorDealer(mod, wdDealer, expectedTimeout, executorSettingsForTest(),
+				WithExecContext(fakeExecCommandSuccessWithHolder(holder)))
 			mut := &mutantStub{
 				status:  mutator.Runnable,
 				mutType: mutator.ConditionalsBoundary,
@@ -452,8 +451,8 @@ func TestMutatorRunInTheCorrectFolder(t *testing.T) {
 		}
 		wdDealer := newWdDealerStub(t)
 		holder := &commandHolder{}
-		mjd := engine.NewExecutorDealer(mod, wdDealer, expectedTimeout, executorSettingsForTest(),
-			engine.WithExecContext(fakeExecCommandSuccessWithHolder(holder)))
+		mjd := NewExecutorDealer(mod, wdDealer, expectedTimeout, executorSettingsForTest(),
+			WithExecContext(fakeExecCommandSuccessWithHolder(holder)))
 		mut := &mutantStub{
 			status:  mutator.Runnable,
 			mutType: mutator.ConditionalsBoundary,
@@ -498,8 +497,8 @@ func TestMutatorRunInTheCorrectFolder(t *testing.T) {
 		}
 
 		holder := &commandHolder{}
-		mjd := engine.NewExecutorDealer(mod, wdDealer, expectedTimeout, executorSettingsForTest(),
-			engine.WithExecContext(fakeExecCommandSuccessWithHolder(holder)))
+		mjd := NewExecutorDealer(mod, wdDealer, expectedTimeout, executorSettingsForTest(),
+			WithExecContext(fakeExecCommandSuccessWithHolder(holder)))
 		mut := &mutantStub{
 			status:  mutator.Runnable,
 			mutType: mutator.ConditionalsBoundary,

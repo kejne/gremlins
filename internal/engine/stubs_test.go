@@ -27,8 +27,8 @@ import (
 	"testing/fstest"
 
 	"github.com/kejne/gremlins/internal/configuration"
-	"github.com/kejne/gremlins/internal/engine"
-	"github.com/kejne/gremlins/internal/engine/workerpool"
+	"github.com/kejne/gremlins/internal/execution"
+	"github.com/kejne/gremlins/internal/execution/workerpool"
 	"github.com/kejne/gremlins/internal/gomodule"
 	"github.com/kejne/gremlins/internal/mutator"
 )
@@ -211,8 +211,8 @@ func (*mutantStub) MutatedSnippet() []byte {
 	return nil
 }
 
-func executorSettingsForTest() engine.ExecutorSettings {
-	return engine.ExecutorSettings{
+func executorSettingsForTest() execution.ExecutorSettings {
+	return execution.ExecutorSettings{
 		BuildTags:          configuration.Get[string](configuration.UnleashTagsKey),
 		DryRun:             configuration.Get[bool](configuration.UnleashDryRunKey),
 		IntegrationMode:    configuration.Get[bool](configuration.UnleashIntegrationMode),

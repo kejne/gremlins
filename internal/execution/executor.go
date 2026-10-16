@@ -14,7 +14,7 @@
  *    limitations under the License.
  */
 
-package engine
+package execution
 
 import (
 	"context"
@@ -26,12 +26,53 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kejne/gremlins/internal/engine/workdir"
-	"github.com/kejne/gremlins/internal/engine/workerpool"
+	"github.com/kejne/gremlins/internal/execution/workdir"
+	"github.com/kejne/gremlins/internal/execution/workerpool"
 	"github.com/kejne/gremlins/internal/gomodule"
 	"github.com/kejne/gremlins/internal/log"
 	"github.com/kejne/gremlins/internal/mutator"
+	"github.com/kejne/gremlins/internal/results"
 )
+
+// RunMutations schedules mutation work and returns detached completed outcomes.
+func RunMutations(ctx context.Context, discovered []mutator.Mutator, dealer ExecutorDealer, settings SchedulingSettings, onComplete func(results.Outcome)) results.Results {
+	pool := workerpool.Initialize("mutator", workerpool.Settings{Workers: settings.Workers, IntegrationMode: settings.IntegrationMode})
+	pool.Start()
+	out := make(chan mutator.Mutator)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for _, mutation := range discovered {
+			select {
+			case <-ctx.Done():
+				pool.Stop()
+
+				return
+			default:
+			}
+			wg.Add(1)
+			pool.AppendExecutor(dealer.NewExecutor(mutation, out, &wg))
+		}
+	}()
+	go func() { wg.Wait(); close(out) }()
+	var outcomes []results.Outcome
+	for mutation := range out {
+		outcome := results.Snapshot(mutation)
+		outcomes = append(outcomes, outcome)
+		if onComplete != nil {
+			onComplete(outcome)
+		}
+	}
+
+	return results.Results{Outcomes: outcomes}
+}
+
+// SchedulingSettings controls execution concurrency.
+type SchedulingSettings struct {
+	Workers         int
+	IntegrationMode bool
+}
 
 // DefaultTimeoutCoefficient is the default multiplier for the timeout length
 // of each test run.

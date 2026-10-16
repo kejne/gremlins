@@ -1,4 +1,4 @@
-//go:build unix
+//go:build windows
 
 /*
  * Copyright 2022 The Gremlins Authors
@@ -16,30 +16,30 @@
  *    limitations under the License.
  */
 
-package engine
+package execution
 
 import (
 	"os/exec"
 	"syscall"
 )
 
-// setupProcessGroup configures the command to run in a new process group.
-// This ensures that child processes (e.g., test binaries spawned by go test)
-// can be cleaned up together when the parent is killed.
+// setupProcessGroup configures the command to use Windows process groups.
+// Note: Windows process group semantics differ from Unix. This is best-effort
+// and may not kill all child processes in all scenarios.
 func setupProcessGroup(cmd *exec.Cmd) {
 	if cmd.SysProcAttr == nil {
 		cmd.SysProcAttr = &syscall.SysProcAttr{}
 	}
-	cmd.SysProcAttr.Setpgid = true
+	cmd.SysProcAttr.CreationFlags = syscall.CREATE_NEW_PROCESS_GROUP
 }
 
-// killProcessGroup kills the process and all its children by sending
-// SIGKILL to the entire process group. This prevents orphaned processes
-// from accumulating and exhausting system resources.
+// killProcessGroup attempts to kill the process on Windows.
+// Note: Windows doesn't have Unix-style process groups, so this
+// is best-effort and may not kill all child processes. Future
+// enhancement could use Windows job objects for better process tree control.
 func killProcessGroup(cmd *exec.Cmd) error {
 	if cmd.Process == nil {
 		return nil
 	}
-	// Negative PID kills the entire process group
-	return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+	return cmd.Process.Kill()
 }

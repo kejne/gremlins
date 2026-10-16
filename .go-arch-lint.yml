@@ -25,8 +25,8 @@ components:
   coverage: { in: internal/coverage/** }
   diff: { in: internal/diff/** }
   engine: { in: internal/engine }
-  engine-workdir: { in: internal/engine/workdir/** }
-  engine-workerpool: { in: internal/engine/workerpool/** }
+  execution-workdir: { in: internal/execution/workdir/** }
+  execution-workerpool: { in: internal/execution/workerpool/** }
   exclusion: { in: internal/exclusion/** }
   execution: { in: internal/execution/** }
   gomodule: { in: internal/gomodule/** }
@@ -44,7 +44,7 @@ deps:
     canUse: [color]
   cli:
     anyVendorDeps: true
-    mayDependOn: [cli-bin, configuration, coverage, diff, engine, engine-workdir, exclusion, execution, flags, gomodule, logging, mutator, reporting]
+    mayDependOn: [cli-bin, configuration, coverage, diff, engine, execution, exclusion, flags, gomodule, logging, mutator, reporting]
   flags:
     canUse: [cobra, pflag, viper]
   configuration:
@@ -57,16 +57,14 @@ deps:
     mayDependOn: [configuration, logging]
     canUse: [gitdiff]
   engine:
-    mayDependOn: [configuration, coverage, diff, engine-workdir, engine-workerpool, exclusion, gomodule, logging, mutator, reporting, results]
-  engine-workdir:
-    mayDependOn: [logging]
-  engine-workerpool:
-    mayDependOn: [configuration]
+    mayDependOn: [configuration, coverage, diff, exclusion, execution, gomodule, mutator, reporting, results]
   exclusion:
     mayDependOn: [configuration]
     canUse: [viper]
+  execution-workdir:
+    mayDependOn: [logging] # Workspace cleanup diagnostics retain the existing logger.
   execution:
-    mayDependOn: [configuration, coverage, diff, engine, exclusion, gomodule, logging, mutator, reporting]
+    mayDependOn: [execution-workdir, execution-workerpool, gomodule, logging, mutator, results]
   gomodule:
     mayDependOn: [configuration, logging]
   logging:

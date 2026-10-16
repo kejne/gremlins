@@ -34,8 +34,9 @@ import (
 	"github.com/kejne/gremlins/internal/coverage"
 	"github.com/kejne/gremlins/internal/diff"
 	"github.com/kejne/gremlins/internal/engine"
-	"github.com/kejne/gremlins/internal/engine/workdir"
 	"github.com/kejne/gremlins/internal/exclusion"
+	"github.com/kejne/gremlins/internal/execution"
+	"github.com/kejne/gremlins/internal/execution/workdir"
 	"github.com/kejne/gremlins/internal/gomodule"
 	"github.com/kejne/gremlins/internal/log"
 	"github.com/kejne/gremlins/internal/mutator"
@@ -164,7 +165,7 @@ func cleanUp(wd string) {
 type runSettings struct {
 	coverage   coverage.Settings
 	engine     engine.Settings
-	executor   engine.ExecutorSettings
+	executor   execution.ExecutorSettings
 	report     report.Settings
 	logger     report.LoggerSettings
 	diffRef    string
@@ -199,7 +200,7 @@ func resolveRunSettings() runSettings {
 	return runSettings{
 		coverage:   coverage.Settings{BuildTags: buildTags, CoverPkg: configuration.Get[string](configuration.UnleashCoverPkgKey), IntegrationMode: integration},
 		engine:     engine.Settings{EnabledMutators: enabled, Workers: configuration.Get[int](configuration.UnleashWorkersKey), IntegrationMode: integration},
-		executor:   engine.ExecutorSettings{BuildTags: buildTags, DryRun: dryRun, IntegrationMode: integration, TestCPU: configuration.Get[int](configuration.UnleashTestCPUKey), TimeoutCoefficient: configuration.Get[int](configuration.UnleashTimeoutCoefficientKey)},
+		executor:   execution.ExecutorSettings{BuildTags: buildTags, DryRun: dryRun, IntegrationMode: integration, TestCPU: configuration.Get[int](configuration.UnleashTestCPUKey), TimeoutCoefficient: configuration.Get[int](configuration.UnleashTimeoutCoefficientKey)},
 		report:     report.Settings{DryRun: dryRun, Output: configuration.Get[string](configuration.UnleashOutputKey), ThresholdEfficacy: thresholdEfficacy, ThresholdMutantCoverage: thresholdCoverage},
 		logger:     report.LoggerSettings{OutputStatuses: configuration.Get[string](configuration.UnleashOutputStatusesKey), OutputDiffStatuses: configuration.Get[string](configuration.UnleashOutputDiffStatusesKey)},
 		diffRef:    configuration.Get[string](configuration.UnleashDiffRef),
@@ -207,7 +208,7 @@ func resolveRunSettings() runSettings {
 	}
 }
 
-func run(ctx context.Context, mod gomodule.GoModule, workDir string, coverageSettings coverage.Settings, engineSettings engine.Settings, executorSettings engine.ExecutorSettings, loggerSettings report.LoggerSettings, diffRef string, exclusionPatterns []string) (report.Results, error) {
+func run(ctx context.Context, mod gomodule.GoModule, workDir string, coverageSettings coverage.Settings, engineSettings engine.Settings, executorSettings execution.ExecutorSettings, loggerSettings report.LoggerSettings, diffRef string, exclusionPatterns []string) (report.Results, error) {
 	fDiff, err := diff.New(diffRef)
 	if err != nil {
 		return report.Results{}, err
@@ -228,7 +229,7 @@ func run(ctx context.Context, mod gomodule.GoModule, workDir string, coverageSet
 	wdDealer := workdir.NewCachedDealer(workDir, mod.Root)
 	defer wdDealer.Clean()
 
-	jDealer := engine.NewExecutorDealer(mod, wdDealer, cProfile.Elapsed, executorSettings)
+	jDealer := execution.NewExecutorDealer(mod, wdDealer, cProfile.Elapsed, executorSettings)
 
 	codeData := engine.CodeData{
 		Cov:       cProfile.Profile,
@@ -236,7 +237,8 @@ func run(ctx context.Context, mod gomodule.GoModule, workDir string, coverageSet
 		Exclusion: exclude,
 	}
 
-	mut := engine.New(mod, codeData, jDealer, engineSettings, engine.WithLogger(report.NewLogger(loggerSettings)))
+	logger := report.NewLogger(loggerSettings)
+	mut := engine.New(mod, codeData, jDealer, engineSettings, engine.WithProgress(logger.Outcome))
 	results, err := mut.Run(ctx)
 	if err != nil {
 		return report.Results{}, err

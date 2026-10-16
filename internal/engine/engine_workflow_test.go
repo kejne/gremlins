@@ -28,7 +28,7 @@ import (
 	"github.com/kejne/gremlins/internal/coverage"
 	"github.com/kejne/gremlins/internal/diff"
 	"github.com/kejne/gremlins/internal/engine"
-	"github.com/kejne/gremlins/internal/engine/workerpool"
+	"github.com/kejne/gremlins/internal/execution/workerpool"
 	"github.com/kejne/gremlins/internal/gomodule"
 	"github.com/kejne/gremlins/internal/log"
 	"github.com/kejne/gremlins/internal/mutator"
@@ -58,6 +58,7 @@ func TestWorkflowDiscoversExecutesAndAssessesMutations(t *testing.T) {
 		sourceFile: {{StartLine: 3, EndLine: 3, StartCol: 11, EndCol: 11}},
 	}
 
+	var progress []resultvalues.Outcome
 	workflow := engine.New(
 		gomodule.GoModule{Name: "example.com/sample", Root: ".", CallingDir: "."},
 		engine.CodeData{
@@ -70,6 +71,7 @@ func TestWorkflowDiscoversExecutesAndAssessesMutations(t *testing.T) {
 			mutator.ConditionalsNegation: true,
 		}, Workers: 1},
 		engine.WithDirFs(workflowFS),
+		engine.WithProgress(func(outcome resultvalues.Outcome) { progress = append(progress, outcome) }),
 	)
 	results, err := workflow.Run(context.Background())
 	if err != nil {
@@ -78,6 +80,16 @@ func TestWorkflowDiscoversExecutesAndAssessesMutations(t *testing.T) {
 
 	if got, want := len(results.Outcomes), 2; got != want {
 		t.Fatalf("discovered %d mutations, want %d", got, want)
+	}
+	if got, want := len(progress), 2; got != want {
+		t.Fatalf("received %d progress outcomes, want %d", got, want)
+	}
+	progressStatuses := map[mutator.Type]mutator.Status{}
+	for _, outcome := range progress {
+		progressStatuses[outcome.Type] = outcome.Status
+		if outcome.Position.Filename != sourceFile {
+			t.Errorf("progress outcome has filename %q, want %q", outcome.Position.Filename, sourceFile)
+		}
 	}
 	statuses := map[mutator.Type]mutator.Status{}
 	for _, mutation := range results.Outcomes {
@@ -94,6 +106,12 @@ func TestWorkflowDiscoversExecutesAndAssessesMutations(t *testing.T) {
 	}
 	if got := statuses[mutator.ConditionalsNegation]; got != mutator.Lived {
 		t.Errorf("conditional-negation outcome = %s, want lived", got)
+	}
+	if got := progressStatuses[mutator.ConditionalsBoundary]; got != statuses[mutator.ConditionalsBoundary] {
+		t.Errorf("progress conditional-boundary outcome = %s, result outcome = %s", got, statuses[mutator.ConditionalsBoundary])
+	}
+	if got := progressStatuses[mutator.ConditionalsNegation]; got != statuses[mutator.ConditionalsNegation] {
+		t.Errorf("progress conditional-negation outcome = %s, result outcome = %s", got, statuses[mutator.ConditionalsNegation])
 	}
 
 	err = report.Do(results, report.Settings{ThresholdEfficacy: 75})

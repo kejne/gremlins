@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	"github.com/kejne/gremlins/internal/configuration"
-	"github.com/kejne/gremlins/internal/engine/workerpool"
+	"github.com/kejne/gremlins/internal/execution/workerpool"
 	"github.com/kejne/gremlins/internal/mutator"
 )
 

@@ -244,11 +244,43 @@ func MutantDiff(m mutator.Mutator) {
 	}
 }
 
-// generateDiff returns a colored unified diff string for a survived mutant,
-// or an empty string if no diff is available.
-func generateDiff(m mutator.Mutator) ([]string, error) {
-	original := m.OrigSnippet()
-	mutated := m.MutatedSnippet()
+// MutantOutcome logs a detached completed mutation outcome.
+func MutantOutcome(outcome resultvalues.Outcome) {
+	status := outcome.Status.String()
+	switch outcome.Status {
+	case mutator.Killed, mutator.Runnable:
+		status = fgHiGreen(outcome.Status)
+	case mutator.Lived:
+		status = fgRed(outcome.Status)
+	case mutator.NotCovered:
+		status = fgHiYellow(outcome.Status)
+	case mutator.TimedOut:
+		status = fgGreen(outcome.Status)
+	case mutator.NotViable, mutator.Skipped:
+		status = fgHiBlack(outcome.Status)
+	}
+	position := fmt.Sprintf("%s:%d:%d", outcome.Position.Filename, outcome.Position.Line, outcome.Position.Column)
+	log.Infof("%s%s %s at %s\n", padding(outcome.Status), status, outcome.Type, position)
+}
+
+// MutantOutcomeDiff logs the unified diff stored in a completed outcome.
+func MutantOutcomeDiff(outcome resultvalues.Outcome) {
+	if len(outcome.OriginalSnippet) == 0 || len(outcome.MutatedSnippet) == 0 {
+		return
+	}
+	diffLines, err := generateSnippetDiff(outcome.OriginalSnippet, outcome.MutatedSnippet)
+	if err != nil {
+		log.Errorf("failed to generate diff for mutant: %s", err.Error())
+
+		return
+	}
+	for _, line := range diffLines {
+		log.Infof("%s%s\n", padding(outcome.Status), line)
+	}
+}
+
+// generateSnippetDiff returns the unified diff between original and mutated source snippets.
+func generateSnippetDiff(original, mutated []byte) ([]string, error) {
 	if len(original) == 0 || len(mutated) == 0 {
 		return nil, nil
 	}
@@ -268,11 +300,7 @@ func generateDiff(m mutator.Mutator) ([]string, error) {
 		switch {
 		case line == "":
 			continue
-		case strings.HasPrefix(line, "---"):
-			continue
-		case strings.HasPrefix(line, "+++"):
-			continue
-		case strings.HasPrefix(line, "@@"):
+		case strings.HasPrefix(line, "---"), strings.HasPrefix(line, "+++"), strings.HasPrefix(line, "@@"):
 			continue
 		case strings.Contains(line, "No newline at end of file"):
 			continue
@@ -286,6 +314,12 @@ func generateDiff(m mutator.Mutator) ([]string, error) {
 	}
 
 	return diffBuilder, nil
+}
+
+// generateDiff returns a colored unified diff string for a survived mutant,
+// or an empty string if no diff is available.
+func generateDiff(m mutator.Mutator) ([]string, error) {
+	return generateSnippetDiff(m.OrigSnippet(), m.MutatedSnippet())
 }
 
 func padding(s mutator.Status) string {
