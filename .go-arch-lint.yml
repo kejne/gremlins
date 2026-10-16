@@ -1,0 +1,78 @@
+version: 3
+workdir: .
+allow:
+  depOnAnyVendor: false
+
+excludeFiles:
+  - "^.*_test\\.go$"
+
+vendors:
+  cobra: { in: github.com/spf13/cobra }
+  pflag: { in: github.com/spf13/pflag }
+  viper: { in: github.com/spf13/viper }
+  homedir: { in: github.com/mitchellh/go-homedir }
+  cover: { in: golang.org/x/tools/cover }
+  gitdiff: { in: github.com/bluekeyes/go-gitdiff/gitdiff }
+  color: { in: github.com/fatih/color }
+  durafmt: { in: github.com/hako/durafmt }
+  udiff: { in: github.com/aymanbagabas/go-udiff }
+
+components:
+  cli: { in: cmd }
+  cli-bin: { in: cmd/gremlins/** }
+  flags: { in: cmd/internal/flags/** }
+  configuration: { in: internal/configuration/** }
+  coverage: { in: internal/coverage/** }
+  diff: { in: internal/diff/** }
+  engine: { in: internal/engine }
+  engine-workdir: { in: internal/engine/workdir/** }
+  engine-workerpool: { in: internal/engine/workerpool/** }
+  exclusion: { in: internal/exclusion/** }
+  execution: { in: internal/execution/** }
+  gomodule: { in: internal/gomodule/** }
+  logging: { in: internal/log/** }
+  mutator: { in: internal/mutator/** }
+  reporting: { in: internal/report }
+  report-internal: { in: internal/report/internal/** }
+
+deps:
+  # Baseline exceptions capture current coupling before the modularity migration.
+  # Tighten these package edges as their owning migration tickets land.
+  cli-bin:
+    mayDependOn: [cli, execution, logging]
+    canUse: [color]
+  cli:
+    anyVendorDeps: true
+    mayDependOn: [cli-bin, configuration, coverage, diff, engine, engine-workdir, exclusion, execution, flags, gomodule, logging, mutator, reporting]
+  flags:
+    canUse: [cobra, pflag, viper]
+  configuration:
+    mayDependOn: [mutator]
+    canUse: [homedir, viper]
+  coverage:
+    mayDependOn: [configuration, gomodule, logging]
+    canUse: [cover]
+  diff:
+    mayDependOn: [configuration, logging]
+    canUse: [gitdiff]
+  engine:
+    mayDependOn: [configuration, coverage, diff, engine-workdir, engine-workerpool, exclusion, gomodule, logging, mutator, reporting]
+  engine-workdir:
+    mayDependOn: [logging]
+  engine-workerpool:
+    mayDependOn: [configuration]
+  exclusion:
+    mayDependOn: [configuration]
+    canUse: [viper]
+  execution:
+    mayDependOn: [configuration, coverage, diff, engine, exclusion, gomodule, logging, mutator, reporting]
+  gomodule:
+    mayDependOn: [configuration, logging]
+  logging:
+    mayDependOn: [configuration]
+    canUse: [color]
+  mutator:
+    mayDependOn: [configuration, logging]
+  reporting:
+    mayDependOn: [configuration, coverage, diff, engine, execution, exclusion, gomodule, logging, mutator, report-internal]
+    canUse: [color, durafmt, udiff]

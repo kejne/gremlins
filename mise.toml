@@ -6,6 +6,7 @@ actionlint = "latest"
 shellcheck = "0.11.0"
 goreleaser = "latest"
 "go:codeberg.org/kejne/covgate" = "v0.1.0"
+"go:github.com/fe3dback/go-arch-lint" = "1.19.0"
 
 [tasks.build]
 description = "Build the Gremlins binary"
