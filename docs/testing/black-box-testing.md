@@ -22,10 +22,8 @@ The source-spec inventory described 26 test files, nine same-package files, four
 | `internal/diff/parse_test.go` | Parser edge cases are a selected migration target. |
 | `internal/exclusion/rules_test.go` | Rule tests exercise private exclusion-rule construction details. |
 | `internal/execution/cancellation_test.go` | Cancellation tests use package-private execution lifecycle fixtures. |
-| `internal/execution/executor_internal_test.go` | Executor argument tests are a selected execution-module migration target. |
 | `internal/execution/executor_test.go` | Executor tests currently share internal execution setup. |
 | `internal/execution/executor_test_helpers_test.go` | Shared executor test helpers are package-private and stay with the existing tests. |
-| `internal/mutation/tokenmutator_internal_test.go` | Token mutation tests are a selected mutation-module migration target. |
 | `internal/results/results_test.go` | Result value tests currently construct package-private result values. |
 
 After the four selected migrations, nine exact allowances are expected to remain: the five listed legacy files plus the four additional same-package files discovered in this checkout. The present ticket establishes enforcement only and does not migrate those four selected files or the additional tests.
