@@ -8,8 +8,9 @@ local checks = new Mapping<String, Step> {
     ["go-vet"] = (Builtins.go_vet) {
         glob = "**/*.go"
     }
-    ["go-lint"] = (Builtins.golangci_lint) {
-        glob = "**/*.go"
+    ["go-lint"] {
+        glob = List("**/*.go", ".golangci.yml", "hk.pkl", "mise.toml", "scripts/check-testpackage-regression.sh")
+        check = "golangci-lint run ./... && sh scripts/check-testpackage-regression.sh"
     }
     ["go-test-and-coverage"] {
         glob = "**/*.go"
