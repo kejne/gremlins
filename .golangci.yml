@@ -52,12 +52,6 @@ linters:
       # Configuration tests cover unexported configuration parsing and defaults.
       - path: '^internal/configuration/configuration_test\.go$'
         linters: [testpackage]
-      # Diff parsing and selection tests are retained as same-package tests pending the planned migration.
-      - path: '^internal/diff/diff_test\.go$'
-        linters: [testpackage]
-      # Parse edge cases are coupled to diff's private parser decomposition.
-      - path: '^internal/diff/parse_test\.go$'
-        linters: [testpackage]
       # Rule tests exercise private exclusion-rule construction details.
       - path: '^internal/exclusion/rules_test\.go$'
         linters: [testpackage]

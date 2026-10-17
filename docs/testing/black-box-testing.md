@@ -18,8 +18,6 @@ The source-spec inventory described 26 test files, nine same-package files, four
 | `cmd/unleash_test.go` | CLI unleash tests share private command setup and fixture helpers. |
 | `cmd/internal/flags/flags_test.go` | Flag parser tests use same-package declarations during command modularization. |
 | `internal/configuration/configuration_test.go` | Configuration tests cover unexported parsing and defaults. |
-| `internal/diff/diff_test.go` | Diff selection tests are a selected migration target. |
-| `internal/diff/parse_test.go` | Parser edge cases are a selected migration target. |
 | `internal/exclusion/rules_test.go` | Rule tests exercise private exclusion-rule construction details. |
 | `internal/execution/cancellation_test.go` | Cancellation tests use package-private execution lifecycle fixtures. |
 | `internal/execution/executor_internal_test.go` | Executor argument tests are a selected execution-module migration target. |
