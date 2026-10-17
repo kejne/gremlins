@@ -1,5 +1,7 @@
 unleash:
   output-statuses: "lc"
+  workers: 4
+  test-cpu: 4
   threshold:
     efficacy: 80
     mutant-coverage: 90
