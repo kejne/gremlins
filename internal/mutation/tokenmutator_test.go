@@ -112,6 +112,83 @@ func TestTokenMutant_Apply_SetsSnippets(t *testing.T) {
 	}
 }
 
+func TestTokenMutant_Apply_SnippetsAtSourceBoundaries(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		source   string
+		original string
+		mutated  string
+	}{
+		{
+			name:     "mutation near beginning",
+			source:   "package p\nfunc f() {\n value := 1 + 2\n}\n",
+			original: "package p\nfunc f() {\n value := 1 + 2\n}\n",
+			mutated:  "package p\n\nfunc f() {\n\tvalue := 1 - 2\n}\n",
+		},
+		{
+			name:     "mutation near end",
+			source:   "package p\n\nfunc f() {\n a := 1\n b := 2\n c := 3\n d := 4\n e := 5 + 6\n}\n",
+			original: " b := 2\n c := 3\n d := 4\n e := 5 + 6\n}\n",
+			mutated:  "\tb := 2\n\tc := 3\n\td := 4\n\te := 5 - 6\n}\n",
+		},
+		{
+			name:     "short source",
+			source:   "package p\nfunc f() { return 1 + 2 }\n",
+			original: "package p\nfunc f() { return 1 + 2 }\n",
+			mutated:  "package p\n\nfunc f()\t{ return 1 - 2 }\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			workdir := t.TempDir()
+			filePath := "source.go"
+			if err := os.WriteFile(filepath.Join(workdir, filePath), []byte(tt.source), 0o600); err != nil {
+				t.Fatal(err)
+			}
+
+			set := token.NewFileSet()
+			file, err := parser.ParseFile(set, filePath, tt.source, parser.ParseComments)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var node *ast.BinaryExpr
+			ast.Inspect(file, func(n ast.Node) bool {
+				if binary, ok := n.(*ast.BinaryExpr); ok && node == nil {
+					node = binary
+				}
+
+				return true
+			})
+			if node == nil {
+				t.Fatal("binary expression node must be found")
+			}
+			tokenNode, ok := mutation.NewTokenNode(node)
+			if !ok {
+				t.Fatal("token node must be created")
+			}
+			mutant := mutation.NewTokenMutant("example.com/test", set, file, tokenNode)
+			mutant.SetType(mutator.ArithmeticBase)
+			mutant.SetStatus(mutator.Runnable)
+			mutant.SetWorkdir(workdir)
+			if err := mutant.Apply(); err != nil {
+				t.Fatal(err)
+			}
+
+			if got := string(mutant.OrigSnippet()); got != tt.original {
+				t.Errorf("OrigSnippet() = %q, want %q", got, tt.original)
+			}
+			if got := string(mutant.MutatedSnippet()); got != tt.mutated {
+				t.Errorf("MutatedSnippet() = %q, want %q", got, tt.mutated)
+			}
+		})
+	}
+}
+
 func TestMutantApplyAndRollback(t *testing.T) {
 	want := []string{
 		"package main\n\nfunc main() {\n\ta := 1 - 2\n\tb := 1 - 2\n}\n",

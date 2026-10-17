@@ -68,6 +68,41 @@ diff --git a/two.go b/two.go
 		}
 	})
 
+	t.Run("selects each separated changed range and excludes the gap", func(t *testing.T) {
+		result := &commandResult{output: []byte(`diff --git a/one.go b/one.go
+--- a/one.go
++++ b/one.go
+@@ -1,2 +1,2 @@
+-old first
++new first
+ context
+@@ -10,2 +10,2 @@
+-old last
++new last
+ context
+`)}
+
+		got, err := diff.NewWithCmd(commandFor(result), "base-ref")
+		if err != nil {
+			t.Fatalf("NewWithCmd() error = %v", err)
+		}
+		for _, test := range []struct {
+			name string
+			line int
+			want bool
+		}{
+			{name: "first changed range", line: 1, want: true},
+			{name: "unchanged gap", line: 5, want: false},
+			{name: "second changed range", line: 10, want: true},
+		} {
+			t.Run(test.name, func(t *testing.T) {
+				if changed := got.IsChanged(token.Position{Filename: "one.go", Line: test.line}); changed != test.want {
+					t.Errorf("IsChanged(one.go:%d) = %v, want %v", test.line, changed, test.want)
+				}
+			})
+		}
+	})
+
 	t.Run("command failure includes command output and error", func(t *testing.T) {
 		commandErr := errors.New("git failed")
 		result := &commandResult{output: []byte("diagnostic"), err: commandErr}
