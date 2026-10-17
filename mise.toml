@@ -33,6 +33,6 @@ description = "Create a clean snapshot release"
 run = "goreleaser release --snapshot --clean"
 
 [tasks.check]
-description = "Run repository checks and build the binary"
+description = "Run all repository checks, including slow full mutation testing, and build the binary"
 depends = ["build"]
-run = "hk check --all"
+run = "hk check --all --slow"
