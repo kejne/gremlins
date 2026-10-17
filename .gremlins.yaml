@@ -1,6 +1,6 @@
 unleash:
   output-statuses: "lc"
-  workers: 4
+  workers: 1
   test-cpu: 4
   threshold:
     efficacy: 80
