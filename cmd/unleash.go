@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"sync"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/spf13/cobra"
@@ -118,22 +117,21 @@ func runUnleash(ctx context.Context) func(cmd *cobra.Command, args []string) err
 		}
 
 		settings := resolveRunSettings()
-		wg := &sync.WaitGroup{}
-		wg.Add(1)
-		cancelled := false
 		var results report.Results
 		logger := report.NewLogger(settings.logger)
-		go runWithCancel(ctx, wg, func(c context.Context) {
-			results, err = run(c, mod, settings.coverage, settings.engine, settings.executor, settings.scheduling, logger.Outcome, settings.diffRef, settings.exclusions)
+		cancelled, runErr := execution.RunWithCancel(ctx, func(c context.Context) error {
+			var runErr error
+			results, runErr = run(c, mod, settings.coverage, settings.engine, settings.executor, settings.scheduling, logger.Outcome, settings.diffRef, settings.exclusions)
+
+			return runErr
 		}, func() {
-			cancelled = true
+			log.Infof("\nShutting down gracefully...\n")
 		})
-		wg.Wait()
-		if cancelled || errors.Is(err, context.Canceled) {
+		if cancelled || errors.Is(runErr, context.Canceled) {
 			return nil
 		}
-		if err != nil {
-			return err
+		if runErr != nil {
+			return runErr
 		}
 
 		stats, assessmentErr := resultvalues.Assess(results.Outcomes, resultvalues.Settings{
@@ -146,18 +144,6 @@ func runUnleash(ctx context.Context) func(cmd *cobra.Command, args []string) err
 
 		return assessmentErr
 	}
-}
-
-func runWithCancel(ctx context.Context, wg *sync.WaitGroup, runner func(c context.Context), onCancel func()) {
-	c, cancel := context.WithCancel(ctx)
-	go func() {
-		<-ctx.Done()
-		log.Infof("\nShutting down gracefully...\n")
-		cancel()
-		onCancel()
-	}()
-	runner(c)
-	wg.Done()
 }
 
 type runSettings struct {

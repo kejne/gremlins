@@ -26,6 +26,84 @@ import (
 	"github.com/kejne/gremlins/internal/mutator"
 )
 
+func TestResolveRunSettingsDefaults(t *testing.T) {
+	configuration.Reset()
+	t.Cleanup(configuration.Reset)
+
+	settings := resolveRunSettings()
+	if settings.coverage.IntegrationMode || settings.executor.IntegrationMode || settings.scheduling.IntegrationMode {
+		t.Fatal("integration mode should default to false in all receiving modules")
+	}
+	if settings.coverage.BuildTags != "" || settings.executor.BuildTags != "" || settings.coverage.CoverPkg != "" {
+		t.Fatal("build tags and cover packages should default to empty")
+	}
+	if settings.scheduling.Workers != 0 || settings.executor.TestCPU != 0 || settings.executor.TimeoutCoefficient != 0 {
+		t.Fatal("worker and test execution settings should default to zero")
+	}
+	if settings.diffRef != "" || len(settings.exclusions) != 0 {
+		t.Fatal("diff ref and exclusions should default to empty")
+	}
+	if settings.report.Output != "" || settings.logger.OutputStatuses != "" || settings.logger.OutputDiffStatuses != "" {
+		t.Fatal("output settings should default to empty")
+	}
+	if settings.thresholdEfficacy != 0 || settings.thresholdMutantCoverage != 0 {
+		t.Fatal("assessment thresholds should default to zero")
+	}
+	for _, typ := range mutator.Types {
+		if got, want := settings.engine.EnabledMutators[typ], configuration.IsDefaultEnabled(typ); got != want {
+			t.Errorf("mutator %s default = %v, want %v", typ, got, want)
+		}
+	}
+}
+
+func TestResolveRunSettingsPropagatesConfiguration(t *testing.T) {
+	configuration.Reset()
+	t.Cleanup(configuration.Reset)
+	configuration.Set(configuration.UnleashIntegrationMode, true)
+	configuration.Set(configuration.UnleashTagsKey, "integration,slow")
+	configuration.Set(configuration.UnleashWorkersKey, 7)
+	configuration.Set(configuration.UnleashTestCPUKey, 3)
+	configuration.Set(configuration.UnleashTimeoutCoefficientKey, 4)
+	configuration.Set(configuration.UnleashCoverPkgKey, "./...,example.com/other")
+	configuration.Set(configuration.UnleashExcludeFiles, []string{`vendor/.*`, `generated/.*`})
+	configuration.Set(configuration.UnleashDiffRef, "main")
+	configuration.Set(configuration.UnleashOutputKey, "results.json")
+	configuration.Set(configuration.UnleashOutputStatusesKey, "lk")
+	configuration.Set(configuration.UnleashOutputDiffStatusesKey, "l")
+	configuration.Set(configuration.UnleashThresholdEfficacyKey, float64(81))
+	configuration.Set(configuration.UnleashThresholdMCoverageKey, float64(64))
+	configuration.Set(configuration.MutantTypeEnabledKey(mutator.ArithmeticBase), false)
+
+	settings := resolveRunSettings()
+	if !settings.coverage.IntegrationMode || !settings.executor.IntegrationMode || !settings.scheduling.IntegrationMode {
+		t.Error("integration mode was not propagated to coverage, executor, and scheduling")
+	}
+	if settings.coverage.BuildTags != "integration,slow" || settings.executor.BuildTags != "integration,slow" {
+		t.Error("build tags were not propagated to coverage and executor")
+	}
+	if settings.scheduling.Workers != 7 || settings.executor.TestCPU != 3 || settings.executor.TimeoutCoefficient != 4 {
+		t.Errorf("execution settings not propagated: scheduling=%+v executor=%+v", settings.scheduling, settings.executor)
+	}
+	if settings.coverage.CoverPkg != "./...,example.com/other" {
+		t.Errorf("cover packages = %q", settings.coverage.CoverPkg)
+	}
+	if settings.diffRef != "main" || strings.Join(settings.exclusions, ",") != `vendor/.*,generated/.*` {
+		t.Errorf("selection settings not propagated: diff=%q exclusions=%v", settings.diffRef, settings.exclusions)
+	}
+	if settings.report.Output != "results.json" || settings.logger.OutputStatuses != "lk" || settings.logger.OutputDiffStatuses != "l" {
+		t.Errorf("reporting settings not propagated: report=%+v logger=%+v", settings.report, settings.logger)
+	}
+	if settings.thresholdEfficacy != 81 || settings.thresholdMutantCoverage != 64 {
+		t.Errorf("assessment thresholds = efficacy %v, mutant coverage %v", settings.thresholdEfficacy, settings.thresholdMutantCoverage)
+	}
+	if settings.engine.EnabledMutators[mutator.ArithmeticBase] {
+		t.Error("explicit mutator override was not honored")
+	}
+	if !settings.engine.EnabledMutators[mutator.ConditionalsBoundary] {
+		t.Error("unspecified mutator should retain its configured default")
+	}
+}
+
 func TestUnleash(t *testing.T) {
 	c, err := newUnleashCmd(context.Background())
 	if err != nil {

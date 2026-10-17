@@ -23,7 +23,6 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"github.com/kejne/gremlins/internal/configuration"
 	"github.com/kejne/gremlins/internal/coverage"
 	"github.com/kejne/gremlins/internal/diff"
 	"github.com/kejne/gremlins/internal/engine"
@@ -35,13 +34,6 @@ import (
 )
 
 func TestWorkflowDiscoversExecutesAndAssessesMutations(t *testing.T) {
-	viperSet(map[string]any{
-		configuration.UnleashDryRunKey:             false,
-		configuration.UnleashWorkersKey:            1,
-		configuration.UnleashThresholdEfficacyKey:  float64(75),
-		configuration.UnleashThresholdMCoverageKey: float64(0),
-	})
-	defer viperReset()
 	log.Init(&bytes.Buffer{}, &bytes.Buffer{})
 	defer log.Reset()
 

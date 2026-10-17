@@ -1,6 +1,6 @@
 # Project guidance
 
-Gremlins is a Go mutation-testing tool. The engine finds AST-level mutations, executes tests against isolated copies, and reports which mutations survive.
+Gremlins is a Go mutation-testing tool. The mutation module discovers and transforms AST-level mutations; the engine orchestrates testing them against isolated copies and reporting which mutations survive.
 
 ## Tooling and checks
 
@@ -8,8 +8,9 @@ Use `hk check` by default; run `hk check --all` before handoff. Install tools wi
 
 ## Architecture
 
-- `internal/engine`: AST traversal and mutation execution orchestration.
-- `internal/mutator`: mutation types and lifecycle/status definitions.
+- `internal/mutation`: AST discovery and source transformations.
+- `internal/engine`: mutation workflow orchestration.
+- `internal/mutator`: mutation rules/types and lifecycle/status definitions.
 - `internal/coverage`: identifies mutations exercised by tests.
 - `internal/execution`: runs test commands and captures outcomes.
 - `internal/report`: console and machine-readable result formatting.

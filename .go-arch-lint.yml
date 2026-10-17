@@ -58,20 +58,14 @@ deps:
     canUse: [gitdiff]
   engine:
     mayDependOn: [coverage, diff, exclusion, execution, gomodule, mutation, mutator, results]
-  exclusion:
-    canUse: [viper]
   execution-workdir:
     mayDependOn: [logging] # Workspace cleanup diagnostics retain the existing logger.
   execution:
     mayDependOn: [execution-workdir, execution-workerpool, gomodule, logging, mutator, results]
-  gomodule:
-    mayDependOn: [configuration, logging]
   logging:
     canUse: [color]
   mutation:
     mayDependOn: [coverage, diff, exclusion, gomodule, mutator]
-  mutator:
-    mayDependOn: [logging]
   reporting:
     mayDependOn: [coverage, diff, exclusion, gomodule, logging, mutator, report-internal, results]
     canUse: [color, durafmt, udiff]
