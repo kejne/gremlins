@@ -8,7 +8,7 @@ Maintainers also lack an automatic check that prevents the repository from accum
 
 Adopt module-level black-box testing as the policy: exercise a cohesive module through its supported interface and assert externally observable behavior. Black-box testing does not mean every test must invoke the CLI, nor does an external test package automatically make an assertion behavioral.
 
-Enable the existing `testpackage` linter through the repository's current lint, check-runner, and CI integration. Remove implicit exemptions and use explicit, explained, temporary per-file allowances for unmigrated same-package tests. Convert the two engine helper-test files and two diff-test files in this increment, leaving five known same-package files explicitly tracked. Review prevents new white-box tests inside grandfathered files until their allowances disappear.
+Enable the existing `testpackage` linter through the repository's current lint, check-runner, and CI integration. Remove implicit exemptions and use explicit, explained, temporary per-file allowances for unmigrated same-package tests. Convert the selected execution/mutation helper tests and two diff-test files in this increment. The implementation checkout has additional same-package debt beyond the design-time inventory; track every remaining file explicitly and explain the inventory drift. Review prevents new white-box tests inside grandfathered files until their allowances disappear.
 
 Preserve meaningful behavioral scenarios rather than the exact number or structure of existing tests. Do not introduce test-only exports or private-access bridges. Inventory external tests that reach into implementation subpackages separately, then remove those violations as their owning modules migrate.
 
@@ -60,10 +60,10 @@ Preserve meaningful behavioral scenarios rather than the exact number or structu
 - Use `testpackage` from the already pinned and installed `golangci-lint`; do not implement a custom repository linter or per-test baseline checker for this increment.
 - Explicitly configure the installed linter so that implicit filename and package exemptions do not undermine the policy. Do not rely on defaults inferred from another linter version.
 - Represent remaining same-package debt with exact, explained per-file exclusions limited to this rule. Do not exclude entire packages, directories, all tests, or unrelated linters. Remove allowances in the same change that migrates their tests; do not suppress individual violations with unexplained directives.
-- The reviewed endpoint for this increment is five known same-package files remaining after the four selected files migrate. The eventual target is no migration allowances. Any necessary lasting exception requires a specific rationale and an explicit policy decision, not a silently retained migration allowance.
+- The design-time endpoint was five same-package files remaining after the four selected files migrated. Revalidation found four additional same-package files in the implementation checkout, so the actual endpoint for this increment is nine exact allowances. The eventual target is no migration allowances. Any necessary lasting exception requires a specific rationale and an explicit policy decision, not a silently retained migration allowance.
 - Recognize the ratchet's granularity: it rejects new violating files but cannot reject a new white-box test added inside an already allowed file. Review enforces the no-new-white-box-tests policy within those files until they migrate.
 - Integrate enforcement into the existing Go lint step and CI path rather than a separate CI-only job. Trigger lint for relevant Go, linter-configuration, and check/tooling-configuration changes, including configuration-only changes.
-- Migrate the two engine private-helper test files and the two diff test files. Re-express meaningful scenarios through existing supported execution, mutation, and diff interfaces; a package declaration change alone is insufficient for private-helper assertions.
+- Migrate the selected execution and mutation private-helper tests and the two diff test files. Re-express meaningful scenarios through existing supported execution, mutation, and diff interfaces; a package declaration change alone is insufficient for private-helper assertions.
 - Preserve supported production interfaces. Do not export helpers or state solely to move tests, add test-only export bridges, or use private-access workarounds. If a scenario cannot be expressed without such changes, reconsider whether it describes supported behavior and surface a genuine boundary problem rather than adding an escape hatch.
 - Preserve meaningful behavioral protection, not a one-to-one correspondence with helper cases or test counts. Replace or remove redundant tests when the same observable contract is protected elsewhere; do not weaken the coverage threshold to make migration pass.
 - Treat imports into a module's implementation subpackages as black-box violations even in external-package tests. Separately inventory known cases and their owning modules; remove them as those modules migrate. Do not claim that `testpackage` detects these imports or arbitrary implementation-coupled assertions.
@@ -73,14 +73,14 @@ Preserve meaningful behavioral scenarios rather than the exact number or structu
 
 ## Testing Decisions
 
-- The test seams were confirmed during the design discussion: supported module interfaces, with engine execution/mutation and diff behavior selected for this increment. Prefer these existing seams; no new product interface or test-only export is required.
+- The test seams were confirmed during the design discussion: supported module interfaces, with execution/mutation and diff behavior selected for this increment. Prefer these existing seams; no new product interface or test-only export is required.
 - For execution argument behavior, exercise the supported executor construction/settings and existing command-execution substitution. Assert the external subprocess invocation contract where relevant, not the private argument-building method or internal scheduling sequence. Preserve meaningful coverage of empty/nonempty build tags, zero/nonzero CPU settings, timeout behavior, and package versus integration selection.
 - For snippets, apply mutations to deterministic fixture source and inspect the exposed original/mutated snippets. Cover reachable boundary behavior such as source near the beginning or end and short files. Do not preserve arbitrary private-helper parameter combinations merely because they were previously callable from same-package tests.
 - For diff behavior, use supported construction with controlled command output, then assert returned changes and changed-location queries. Cover nil/empty behavior, included/excluded locations, multiple files and change ranges, insertion/deletion behavior, command failures, and malformed diff input where these represent existing contracts.
 - Existing generic command substitution supports a test-local concrete command result implementing the required output method; do not export its private constraint merely to write external tests. Prefer direct explicit reference inputs over unrelated global configuration setup when using this seam.
 - Existing prior art includes external engine executor tests with injected command execution and helper processes, mutation tests that apply changes to temporary source files and assert snippets, workflow tests using filesystem fixtures, and diff tests with controlled command output. Reuse those patterns without copying their implementation-detail assertions wholesale.
 - Demonstrate that a representative new same-package test outside the allowance list produces a lint failure and that an external-package equivalent passes. Verify that would-be implicit filename/package exemptions do not bypass the intended configuration. Use disposable fixtures or temporary changes, with no seeded violations left in the repository.
-- Verify that the remaining five exact allowances work, that the four migrated files need no allowance, and that exclusions do not suppress unrelated lint diagnostics. Do not present this file-level check as protection against additions inside allowed files.
+- Verify that the remaining nine exact allowances work, that the four migrated test paths need no allowance, and that exclusions do not suppress unrelated lint diagnostics. Do not present this file-level check as protection against additions inside allowed files.
 - Demonstrate that changing only linter configuration triggers the local lint step. Verify relevant check/tooling configuration changes also trigger lint and that CI continues using the same full-check path.
 - Review the migrated assertions for observable behavior and the absence of private-access bridges or implementation-subpackage imports. Record any pre-existing out-of-scope semantic violations rather than silently blessing them because package lint passes.
 - Keep tests deterministic and independent of network access. Retain source isolation/restoration and existing process cleanup semantics. Handle discovered behavioral defects separately rather than changing them opportunistically.
@@ -103,22 +103,24 @@ Preserve meaningful behavioral scenarios rather than the exact number or structu
 
 Related architectural work: https://github.com/kejne/gremlins/issues/1. The accepted ADR describes a target design, not a claim that the whole modularity migration is already complete. This spec complements that work; it does not require its full completion before the contained testing-policy increment can land.
 
-The read-only inventory at design time found 26 Go test files: 9 same-package files and 17 external-package files. File counts describe package declarations, not a semantic audit of every assertion. Revalidate the inventory against the implementation checkout and explain any drift rather than broadening exclusions.
+The read-only inventory at design time found 26 Go test files: 9 same-package files and 17 external-package files. File counts describe package declarations, not a semantic audit of every assertion. Revalidation before implementation on `feat/enforced-black-box-testing` found 31 test files and 13 same-package files. Four additional same-package files had appeared since design: `internal/execution/cancellation_test.go`, `internal/execution/executor_test.go`, `internal/execution/executor_test_helpers_test.go`, and `internal/results/results_test.go`. They were individually grandfathered rather than silently ignored or expanded into this migration.
 
-The agreed first migration comprises:
+The engine helper-test paths from the design-time inventory did not exist in the implementation checkout because responsibilities had moved. The selected current-checkout paths were:
 
-- `internal/engine/executor_internal_test.go`
-- `internal/engine/tokenmutator_internal_test.go`
-- `internal/diff/diff_test.go`
-- `internal/diff/parse_test.go`
+- `internal/execution/executor_internal_test.go` — migrated to external-package behavioral tests.
+- `internal/mutation/tokenmutator_internal_test.go` — removed after review found its helper-level cases redundant with existing observable mutation behavior coverage.
+- `internal/diff/diff_test.go` — migrated to external-package behavioral tests.
+- `internal/diff/parse_test.go` — migrated to external-package behavioral tests.
 
-The five remaining same-package files to identify individually in the migration allowances are:
+The original five same-package files remain explicitly allowed:
 
 - `cmd/gremlins_test.go`
 - `cmd/unleash_test.go`
 - `cmd/internal/flags/flags_test.go`
 - `internal/configuration/configuration_test.go`
 - `internal/exclusion/rules_test.go`
+
+Together with the four additional same-package files above, these are the nine remaining exact allowances after the selected migrations. The post-migration checkout contains 30 test files, 9 same-package files, and 21 external-package files.
 
 A known semantic violation outside the first slice is `internal/report/report_test.go` importing `report/internal`. Tests also retain some ambient configuration setup and implementation-coupled assertions despite external package declarations. The initial inventory was representative, not exhaustive; document additional findings without turning this increment into a whole-repository rewrite.
 

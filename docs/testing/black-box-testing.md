@@ -10,7 +10,7 @@ The pinned golangci-lint `testpackage` linter is enabled with its implicit filen
 
 These are file-level allowances. Lint cannot distinguish an old test from a new white-box test added inside an allowed file. Review must reject new white-box tests in every grandfathered file. Remove each allowance with its migration. No allowance is an approved lasting exception; any lasting exception requires an explicit policy decision and specific rationale.
 
-The source-spec inventory described 26 test files, nine same-package files, four planned migrations, and five remaining files. Revalidation on `feat/enforced-black-box-testing` found 31 test files and 13 same-package files. The four planned tests now reside in this checkout as `internal/execution/executor_internal_test.go`, `internal/mutation/tokenmutator_internal_test.go`, `internal/diff/diff_test.go`, and `internal/diff/parse_test.go`; the old engine paths are absent. Four additional same-package files were also present: `internal/execution/cancellation_test.go`, `internal/execution/executor_test.go`, `internal/execution/executor_test_helpers_test.go`, and `internal/results/results_test.go`. They are individually allowed rather than ignored or migrated in this enforcement ticket.
+The source-spec inventory described 26 test files, nine same-package files, four planned migrations, and five remaining files. Revalidation on `feat/enforced-black-box-testing` found 31 test files and 13 same-package files. The selected migration paths in this checkout were `internal/execution/executor_internal_test.go`, `internal/mutation/tokenmutator_internal_test.go`, `internal/diff/diff_test.go`, and `internal/diff/parse_test.go`; the old engine paths are absent. The execution and diff tests were migrated to external-package behavior tests, and the mutation helper test file was removed after review found its helper-level cases redundant with existing observable mutation coverage. Four additional same-package files were also present: `internal/execution/cancellation_test.go`, `internal/execution/executor_test.go`, `internal/execution/executor_test_helpers_test.go`, and `internal/results/results_test.go`. They remain individually allowed.
 
 | Current same-package file | Temporary rationale |
 | --- | --- |
@@ -24,7 +24,7 @@ The source-spec inventory described 26 test files, nine same-package files, four
 | `internal/execution/executor_test_helpers_test.go` | Shared executor test helpers are package-private and stay with the existing tests. |
 | `internal/results/results_test.go` | Result value tests currently construct package-private result values. |
 
-After the four selected migrations, nine exact allowances are expected to remain: the five listed legacy files plus the four additional same-package files discovered in this checkout. The present ticket establishes enforcement only and does not migrate those four selected files or the additional tests.
+After the four selected migrations, nine exact allowances remain: the five listed legacy files plus the four additional same-package files discovered in this checkout. The migration removed exactly four allowances; no blanket package or directory exemptions were added.
 
 ## Semantic coupling inventory
 
