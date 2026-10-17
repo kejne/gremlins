@@ -33,9 +33,9 @@ type DiscoveryData struct {
 }
 
 // Discover finds enabled Go AST mutations that match coverage and changed-line data.
-func Discover(ctx context.Context, source fs.FS, module gomodule.GoModule, data DiscoveryData, settings DiscoverySettings) ([]mutator.Mutator, error) {
+func Discover(ctx context.Context, source fs.FS, module gomodule.GoModule, data DiscoveryData, settings DiscoverySettings) ([]mutator.Mutant, error) {
 	d := discovery{source: source, module: module, data: data, settings: settings}
-	var mutations []mutator.Mutator
+	var mutations []mutator.Mutant
 	err := fs.WalkDir(source, ".", func(path string, _ fs.DirEntry, walkErr error) error {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -68,7 +68,7 @@ type discovery struct {
 	settings DiscoverySettings
 }
 
-func (d *discovery) runOnFile(fileName string) ([]mutator.Mutator, error) {
+func (d *discovery) runOnFile(fileName string) ([]mutator.Mutant, error) {
 	src, err := fs.ReadFile(d.source, fileName)
 	if err != nil {
 		return nil, fmt.Errorf("read %q: %w", fileName, err)
@@ -78,7 +78,7 @@ func (d *discovery) runOnFile(fileName string) ([]mutator.Mutator, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parse %q: %w", fileName, err)
 	}
-	var mutations []mutator.Mutator
+	var mutations []mutator.Mutant
 	ast.Inspect(file, func(node ast.Node) bool {
 		n, ok := NewTokenNode(node)
 		if ok {
@@ -91,13 +91,13 @@ func (d *discovery) runOnFile(fileName string) ([]mutator.Mutator, error) {
 	return mutations, nil
 }
 
-func (d *discovery) findMutations(fileName string, set *token.FileSet, file *ast.File, node *NodeToken) []mutator.Mutator {
+func (d *discovery) findMutations(fileName string, set *token.FileSet, file *ast.File, node *NodeToken) []mutator.Mutant {
 	types, ok := TokenMutantType[node.Tok()]
 	if !ok {
 		return nil
 	}
 	pkg := d.pkgName(fileName, file.Name.Name)
-	var mutations []mutator.Mutator
+	var mutations []mutator.Mutant
 	for _, mt := range types {
 		if !d.settings.EnabledMutators[mt] {
 			continue

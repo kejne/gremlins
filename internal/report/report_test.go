@@ -49,12 +49,12 @@ func TestReport(t *testing.T) {
 
 	nrTestCases := []struct {
 		name    string
-		mutants []mutator.Mutator
+		mutants []mutator.Mutant
 		want    string
 	}{
 		{
 			name: "reports findings in normal run",
-			mutants: []mutator.Mutator{
+			mutants: []mutator.Mutant{
 				stubMutant{status: mutator.Lived, mutantType: mutator.ConditionalsNegation, position: fakePosition},
 				stubMutant{status: mutator.Killed, mutantType: mutator.ConditionalsNegation, position: fakePosition},
 				stubMutant{status: mutator.NotCovered, mutantType: mutator.ConditionalsNegation, position: fakePosition},
@@ -72,7 +72,7 @@ func TestReport(t *testing.T) {
 		},
 		{
 			name: "reports findings with no coverage",
-			mutants: []mutator.Mutator{
+			mutants: []mutator.Mutant{
 				stubMutant{status: mutator.NotCovered, mutantType: mutator.ConditionalsNegation, position: fakePosition},
 			},
 			want: "\n" +
@@ -85,7 +85,7 @@ func TestReport(t *testing.T) {
 		},
 		{
 			name: "reports findings with timeouts",
-			mutants: []mutator.Mutator{
+			mutants: []mutator.Mutant{
 				stubMutant{status: mutator.TimedOut, mutantType: mutator.ConditionalsNegation, position: fakePosition},
 				stubMutant{status: mutator.TimedOut, mutantType: mutator.ConditionalsBoundary, position: fakePosition},
 			},
@@ -99,7 +99,7 @@ func TestReport(t *testing.T) {
 		},
 		{
 			name:    "reports nothing if no result",
-			mutants: []mutator.Mutator{},
+			mutants: []mutator.Mutant{},
 			want: "\n" +
 				"No results to report.\n",
 		},
@@ -127,12 +127,12 @@ func TestReport(t *testing.T) {
 
 	drTestCases := []struct {
 		name    string
-		mutants []mutator.Mutator
+		mutants []mutator.Mutant
 		want    string
 	}{
 		{
 			name: "reports findings in dry-run",
-			mutants: []mutator.Mutator{
+			mutants: []mutator.Mutant{
 				stubMutant{status: mutator.Runnable, mutantType: mutator.ConditionalsNegation, position: fakePosition},
 				stubMutant{status: mutator.Runnable, mutantType: mutator.ConditionalsNegation, position: fakePosition},
 				stubMutant{status: mutator.NotCovered, mutantType: mutator.ConditionalsNegation, position: fakePosition},
@@ -145,7 +145,7 @@ func TestReport(t *testing.T) {
 		},
 		{
 			name: "reports coverage zero in dry-run with timeout",
-			mutants: []mutator.Mutator{
+			mutants: []mutator.Mutant{
 				stubMutant{status: mutator.TimedOut, mutantType: mutator.ConditionalsNegation, position: fakePosition},
 			},
 			want: "\n" +
@@ -260,7 +260,7 @@ func TestAssessment(t *testing.T) {
 			defer viper.Reset()
 
 			// Always 50%
-			mutants := []mutator.Mutator{
+			mutants := []mutator.Mutant{
 				stubMutant{status: mutator.Killed, mutantType: mutator.ConditionalsNegation, position: fakePosition},
 				stubMutant{status: mutator.Lived, mutantType: mutator.ConditionalsNegation, position: fakePosition},
 				stubMutant{status: mutator.NotCovered, mutantType: mutator.ConditionalsNegation, position: fakePosition},
@@ -306,7 +306,7 @@ func TestAssessmentWithOnlySkippedMutants(t *testing.T) {
 	defer viper.Reset()
 
 	data := report.Results{
-		Outcomes: snapshotMutants([]mutator.Mutator{
+		Outcomes: snapshotMutants([]mutator.Mutant{
 			stubMutant{status: mutator.Skipped, mutantType: mutator.ConditionalsNegation, position: fakePosition},
 		}),
 		Elapsed: time.Minute,
@@ -476,7 +476,7 @@ func TestMutantLog(t *testing.T) {
 
 func TestReportToFile(t *testing.T) {
 	outFile := "findings.json"
-	mutants := []mutator.Mutator{
+	mutants := []mutator.Mutant{
 		stubMutant{status: mutator.Killed, mutantType: mutator.ConditionalsNegation, position: newPosition("file1.go", 3, 10)},
 		stubMutant{status: mutator.Lived, mutantType: mutator.ArithmeticBase, position: newPosition("file1.go", 8, 20)},
 		stubMutant{status: mutator.NotCovered, mutantType: mutator.IncrementDecrement, position: newPosition("file1.go", 7, 40)},
@@ -649,7 +649,7 @@ func (s stubMutant) MutatedSnippet() []byte {
 	return s.mutatedSnippet
 }
 
-func snapshotMutants(mutants []mutator.Mutator) []results.Outcome {
+func snapshotMutants(mutants []mutator.Mutant) []results.Outcome {
 	outcomes := make([]results.Outcome, 0, len(mutants))
 	for _, mutant := range mutants {
 		outcomes = append(outcomes, results.Snapshot(mutant))

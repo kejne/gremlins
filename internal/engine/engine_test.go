@@ -499,7 +499,7 @@ func TestMutations(t *testing.T) {
 			mapFS, mod, c := loadFixture(tc.fixture, ".")
 			defer c()
 
-			mut := engine.New(mod, engine.CodeData{Cov: tc.covResult.Profile}, &runnerStub{}, engine.Settings{EnabledMutators: enabledMutatorsForTest(), Workers: configuration.Get[int](configuration.UnleashWorkersKey), IntegrationMode: configuration.Get[bool](configuration.UnleashIntegrationMode)}, engine.WithDirFs(mapFS))
+			mut := engine.New(mod, engine.CodeData{Cov: tc.covResult.Profile}, &runnerStub{}, engine.Settings{EnabledMutators: enabledMutatorsForTest()}, engine.WithDirFs(mapFS))
 			res, err := mut.Run(context.Background())
 			if err != nil {
 				t.Fatal(err)
@@ -538,7 +538,7 @@ func TestMutantSkipDisabled(t *testing.T) {
 			})
 			defer viperReset()
 
-			mut := engine.New(mod, testCodeData, &runnerStub{}, engine.Settings{EnabledMutators: enabledMutatorsForTest(), Workers: configuration.Get[int](configuration.UnleashWorkersKey), IntegrationMode: configuration.Get[bool](configuration.UnleashIntegrationMode)}, engine.WithDirFs(mapFS))
+			mut := engine.New(mod, testCodeData, &runnerStub{}, engine.Settings{EnabledMutators: enabledMutatorsForTest()}, engine.WithDirFs(mapFS))
 			res, err := mut.Run(context.Background())
 			if err != nil {
 				t.Fatal(err)
@@ -566,7 +566,7 @@ func TestDisablingOneMutantTypeDoesNotDisableOthersForSameToken(t *testing.T) {
 	})
 	defer viperReset()
 
-	mut := engine.New(mod, testCodeData, &runnerStub{}, engine.Settings{EnabledMutators: enabledMutatorsForTest(), Workers: configuration.Get[int](configuration.UnleashWorkersKey), IntegrationMode: configuration.Get[bool](configuration.UnleashIntegrationMode)}, engine.WithDirFs(mapFS))
+	mut := engine.New(mod, testCodeData, &runnerStub{}, engine.Settings{EnabledMutators: enabledMutatorsForTest()}, engine.WithDirFs(mapFS))
 	res, err := mut.Run(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -607,7 +607,7 @@ func TestSkipTestAndNonGoFiles(t *testing.T) {
 	}
 	viperSet(map[string]any{configuration.UnleashDryRunKey: true})
 	defer viperReset()
-	mut := engine.New(mod, engine.CodeData{}, &runnerStub{}, engine.Settings{EnabledMutators: enabledMutatorsForTest(), Workers: configuration.Get[int](configuration.UnleashWorkersKey), IntegrationMode: configuration.Get[bool](configuration.UnleashIntegrationMode)}, engine.WithDirFs(sys))
+	mut := engine.New(mod, engine.CodeData{}, &runnerStub{}, engine.Settings{EnabledMutators: enabledMutatorsForTest()}, engine.WithDirFs(sys))
 	res, err := mut.Run(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -637,7 +637,7 @@ func TestSkipNotDiffMutants(t *testing.T) {
 	codeData := engine.CodeData{Diff: diff.Diff{
 		"file.go": nil,
 	}}
-	mut := engine.New(mod, codeData, &runnerStub{}, engine.Settings{EnabledMutators: enabledMutatorsForTest(), Workers: configuration.Get[int](configuration.UnleashWorkersKey), IntegrationMode: configuration.Get[bool](configuration.UnleashIntegrationMode)}, engine.WithDirFs(sys))
+	mut := engine.New(mod, codeData, &runnerStub{}, engine.Settings{EnabledMutators: enabledMutatorsForTest()}, engine.WithDirFs(sys))
 	res, err := mut.Run(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -751,7 +751,7 @@ func TestStopsOnCancel(t *testing.T) {
 	mapFS, mod, c := loadFixture(defaultFixture, ".")
 	defer c()
 
-	mut := engine.New(mod, testCodeData, &runnerStub{}, engine.Settings{EnabledMutators: enabledMutatorsForTest(), Workers: configuration.Get[int](configuration.UnleashWorkersKey), IntegrationMode: configuration.Get[bool](configuration.UnleashIntegrationMode)}, engine.WithDirFs(mapFS))
+	mut := engine.New(mod, testCodeData, &runnerStub{}, engine.Settings{EnabledMutators: enabledMutatorsForTest()}, engine.WithDirFs(mapFS))
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()

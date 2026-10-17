@@ -111,11 +111,11 @@ func (dealerStub) Clean() {}
 func (dealerStub) WorkDir() string { return "/tmp" }
 
 type runnerStub struct {
-	gotMutants []mutator.Mutator
-	complete   func(mutator.Mutator)
+	gotMutants []mutator.Mutant
+	complete   func(mutator.Mutant)
 }
 
-func (r *runnerStub) Run(_ context.Context, discovered []mutator.Mutator, _ execution.SchedulingSettings, onComplete func(results.Outcome)) results.Results {
+func (r *runnerStub) Run(_ context.Context, discovered []mutator.Mutant, onComplete func(results.Outcome)) results.Results {
 	r.gotMutants = append(r.gotMutants, discovered...)
 	outcomes := make([]results.Outcome, 0, len(discovered))
 	for _, mutation := range discovered {

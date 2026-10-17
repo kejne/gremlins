@@ -28,7 +28,7 @@ import (
 	"github.com/kejne/gremlins/internal/mutator"
 )
 
-// TokenMutant is a mutator.Mutator of a token.Token.
+// TokenMutant is a mutator.Mutant of a token.Token.
 //
 // Since the AST is shared among mutants, it is important to avoid that more
 // than one mutation is applied to the same file before writing it. For this
@@ -68,7 +68,7 @@ func (m *TokenMutant) Type() mutator.Type {
 	return m.mutantType
 }
 
-// SetType sets the mutator.Type of the mutant.Mutator.
+// SetType sets the mutator.Type of the mutant.Mutant.
 func (m *TokenMutant) SetType(mt mutator.Type) {
 	m.mutantType = mt
 }
@@ -78,7 +78,7 @@ func (m *TokenMutant) Status() mutator.Status {
 	return m.status
 }
 
-// SetStatus sets the mutator.Status of the mutant.Mutator.
+// SetStatus sets the mutator.Status of the mutant.Mutant.
 func (m *TokenMutant) SetStatus(s mutator.Status) {
 	m.status = s
 }
@@ -98,7 +98,7 @@ func (m *TokenMutant) Pkg() string {
 	return m.pkg
 }
 
-// Apply saves the original token.Token of the mutator.Mutator and sets the
+// Apply saves the original token.Token of the mutator.Mutant and sets the
 // current token from the tokenMutations table.
 // Apply overwrites the source code file with the mutated one. It also
 // stores the original file in the TokenMutant in order to allow
@@ -203,7 +203,7 @@ func (m *TokenMutant) SetWorkdir(path string) {
 	m.workDir = path
 }
 
-// Workdir returns the current working dir in which the mutator.Mutator will apply its mutations.
+// Workdir returns the current working dir in which the mutator.Mutant will apply its mutations.
 func (m *TokenMutant) Workdir() string {
 	return m.workDir
 }

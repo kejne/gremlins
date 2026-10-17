@@ -122,8 +122,9 @@ func runUnleash(ctx context.Context) func(cmd *cobra.Command, args []string) err
 		wg.Add(1)
 		cancelled := false
 		var results report.Results
+		logger := report.NewLogger(settings.logger)
 		go runWithCancel(ctx, wg, func(c context.Context) {
-			results, err = run(c, mod, settings.coverage, settings.engine, settings.executor, settings.logger, settings.diffRef, settings.exclusions)
+			results, err = run(c, mod, settings.coverage, settings.engine, settings.executor, settings.scheduling, logger.Outcome, settings.diffRef, settings.exclusions)
 		}, func() {
 			cancelled = true
 		})
@@ -165,6 +166,7 @@ type runSettings struct {
 	executor                execution.ExecutorSettings
 	report                  report.Settings
 	logger                  report.LoggerSettings
+	scheduling              execution.SchedulingSettings
 	thresholdEfficacy       float64
 	thresholdMutantCoverage float64
 	diffRef                 string
@@ -198,17 +200,18 @@ func resolveRunSettings() runSettings {
 
 	return runSettings{
 		coverage:          coverage.Settings{BuildTags: buildTags, CoverPkg: configuration.Get[string](configuration.UnleashCoverPkgKey), IntegrationMode: integration},
-		engine:            engine.Settings{EnabledMutators: enabled, Workers: configuration.Get[int](configuration.UnleashWorkersKey), IntegrationMode: integration},
+		engine:            engine.Settings{EnabledMutators: enabled},
 		executor:          execution.ExecutorSettings{BuildTags: buildTags, DryRun: dryRun, IntegrationMode: integration, TestCPU: configuration.Get[int](configuration.UnleashTestCPUKey), TimeoutCoefficient: configuration.Get[int](configuration.UnleashTimeoutCoefficientKey)},
 		report:            report.Settings{DryRun: dryRun, Output: configuration.Get[string](configuration.UnleashOutputKey)},
 		thresholdEfficacy: thresholdEfficacy, thresholdMutantCoverage: thresholdCoverage,
 		logger:     report.LoggerSettings{OutputStatuses: configuration.Get[string](configuration.UnleashOutputStatusesKey), OutputDiffStatuses: configuration.Get[string](configuration.UnleashOutputDiffStatusesKey)},
+		scheduling: execution.SchedulingSettings{Workers: configuration.Get[int](configuration.UnleashWorkersKey), IntegrationMode: integration},
 		diffRef:    configuration.Get[string](configuration.UnleashDiffRef),
 		exclusions: viper.GetStringSlice(configuration.UnleashExcludeFiles),
 	}
 }
 
-func run(ctx context.Context, mod gomodule.GoModule, coverageSettings coverage.Settings, engineSettings engine.Settings, executorSettings execution.ExecutorSettings, loggerSettings report.LoggerSettings, diffRef string, exclusionPatterns []string) (report.Results, error) {
+func run(ctx context.Context, mod gomodule.GoModule, coverageSettings coverage.Settings, engineSettings engine.Settings, executorSettings execution.ExecutorSettings, schedulingSettings execution.SchedulingSettings, onProgress func(resultvalues.Outcome), diffRef string, exclusionPatterns []string) (report.Results, error) {
 	return execution.WithWorkspace(func(workDir string) (report.Results, error) {
 		fDiff, err := diff.New(diffRef)
 		if err != nil {
@@ -238,8 +241,8 @@ func run(ctx context.Context, mod gomodule.GoModule, coverageSettings coverage.S
 			Exclusion: exclude,
 		}
 
-		logger := report.NewLogger(loggerSettings)
-		mut := engine.New(mod, codeData, execution.NewRunner(jDealer), engineSettings, engine.WithProgress(logger.Outcome))
+		runner := execution.NewRunner(jDealer, schedulingSettings)
+		mut := engine.New(mod, codeData, runner, engineSettings, engine.WithProgress(onProgress))
 		results, err := mut.Run(ctx)
 		if err != nil {
 			return report.Results{}, err

@@ -131,36 +131,36 @@ func (mt Type) String() string {
 	}
 }
 
-// Mutator represents a possible mutation of the source code.
-type Mutator interface {
-	// Type returns the Type of the Mutator.
+// Mutant represents a possible mutation of the source code.
+type Mutant interface {
+	// Type returns the Type of the Mutant.
 	Type() Type
 
-	// SetType sets the Type of the Mutator.
+	// SetType sets the Type of the Mutant.
 	SetType(mt Type)
 
-	// Status returns the Status of the Mutator.
+	// Status returns the Status of the Mutant.
 	Status() Status
 
-	// SetStatus sets the Status of the Mutator.
+	// SetStatus sets the Status of the Mutant.
 	SetStatus(s Status)
 
-	// Position returns the token.Position for the Mutator.
+	// Position returns the token.Position for the Mutant.
 	// token.Position consumes more space than token.Pos, and in the future
-	// we can consider a refactoring to remove its use and only use Mutator.Pos.
+	// we can consider a refactoring to remove its use and only use Mutant.Pos.
 	Position() token.Position
 
-	// Pos returns the token.Pos of the Mutator.
+	// Pos returns the token.Pos of the Mutant.
 	Pos() token.Pos
 
-	// Pkg returns the package where the Mutator is fount.
+	// Pkg returns the package where the Mutant is fount.
 	Pkg() string
 
 	// SetWorkdir sets the working directory which contains the source code on
-	// which the Mutator will apply its mutations.
+	// which the Mutant will apply its mutations.
 	SetWorkdir(p string)
 
-	// Workdir returns the current working dir in which the Mutator will apply its mutations
+	// Workdir returns the current working dir in which the Mutant will apply its mutations
 	Workdir() string
 
 	// Apply applies the mutation on the actual source code.

@@ -57,7 +57,7 @@ deps:
     mayDependOn: [logging]
     canUse: [gitdiff]
   engine:
-    mayDependOn: [coverage, diff, exclusion, execution, gomodule, mutation, mutator, reporting, results]
+    mayDependOn: [coverage, diff, exclusion, execution, gomodule, mutation, mutator, results]
   exclusion:
     canUse: [viper]
   execution-workdir:

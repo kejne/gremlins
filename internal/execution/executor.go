@@ -34,24 +34,22 @@ import (
 	"github.com/kejne/gremlins/internal/results"
 )
 
-// Runner executes discovered mutations and returns detached completed outcomes.
-type Runner interface {
-	Run(ctx context.Context, discovered []mutator.Mutator, settings SchedulingSettings, onComplete func(results.Outcome)) results.Results
-}
-
-type mutationRunner struct {
-	dealer *MutantExecutorDealer
+// MutationRunner executes mutations using the configured execution workers.
+type MutationRunner struct {
+	dealer             *MutantExecutorDealer
+	schedulingSettings SchedulingSettings
 }
 
 // NewRunner creates an execution runner using the provided mutation executor.
-func NewRunner(dealer *MutantExecutorDealer) Runner {
-	return mutationRunner{dealer: dealer}
+func NewRunner(dealer *MutantExecutorDealer, schedulingSettings SchedulingSettings) MutationRunner {
+	return MutationRunner{dealer: dealer, schedulingSettings: schedulingSettings}
 }
 
-func (r mutationRunner) Run(ctx context.Context, discovered []mutator.Mutator, settings SchedulingSettings, onComplete func(results.Outcome)) results.Results {
-	pool := workerpool.Initialize("mutator", workerpool.Settings{Workers: settings.Workers, IntegrationMode: settings.IntegrationMode})
+// Run executes discovered mutations and reports each completed outcome.
+func (r MutationRunner) Run(ctx context.Context, discovered []mutator.Mutant, onComplete func(results.Outcome)) results.Results {
+	pool := workerpool.Initialize("mutator", workerpool.Settings{Workers: r.schedulingSettings.Workers, IntegrationMode: r.schedulingSettings.IntegrationMode})
 	pool.Start()
-	out := make(chan mutator.Mutator)
+	out := make(chan mutator.Mutant)
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
@@ -174,7 +172,7 @@ func NewExecutorDealer(mod gomodule.GoModule, wdd workdir.Dealer, elapsed time.D
 }
 
 // newExecutor creates a worker-pool executor for one mutation.
-func (m MutantExecutorDealer) newExecutor(mut mutator.Mutator, outCh chan<- mutator.Mutator, wg *sync.WaitGroup) workerpool.Executor {
+func (m MutantExecutorDealer) newExecutor(mut mutator.Mutant, outCh chan<- mutator.Mutant, wg *sync.WaitGroup) workerpool.Executor {
 	mj := mutantExecutor{
 		mutant:            mut,
 		outCh:             outCh,
@@ -195,9 +193,9 @@ func (m MutantExecutorDealer) newExecutor(mut mutator.Mutator, outCh chan<- muta
 type execContext = func(ctx context.Context, name string, args ...string) *exec.Cmd
 
 type mutantExecutor struct {
-	mutant            mutator.Mutator
+	mutant            mutator.Mutant
 	wdDealer          workdir.Dealer
-	outCh             chan<- mutator.Mutator
+	outCh             chan<- mutator.Mutant
 	wg                *sync.WaitGroup
 	execContext       execContext
 	module            gomodule.GoModule
@@ -210,7 +208,7 @@ type mutantExecutor struct {
 
 // Start is the implementation of the workerpool.Executor definition and is the
 // method responsible for performing the actual mutation testing.
-// The executor runs on its mutator.Mutator.
+// The executor runs on its mutator.Mutant.
 // If it is RUNNABLE, and it is not in dry-run mode, it will apply the mutation,
 // run the tests and mark the TokenMutant as either KILLED or LIVED depending
 // on the result. If the tests pass, it means the TokenMutant survived, so it

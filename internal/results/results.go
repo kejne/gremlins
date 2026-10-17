@@ -26,7 +26,7 @@ type Position struct {
 }
 
 // Snapshot copies all mutable data exposed by a mutator into an ordinary outcome value.
-func Snapshot(m mutator.Mutator) Outcome {
+func Snapshot(m mutator.Mutant) Outcome {
 	p := m.Position()
 
 	return Outcome{

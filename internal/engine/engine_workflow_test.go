@@ -63,7 +63,7 @@ func TestWorkflowDiscoversExecutesAndAssessesMutations(t *testing.T) {
 			Cov:  coverageProfile,
 			Diff: diff.Diff{diff.FileName(sourceFile): {{StartLine: 3, EndLine: 3}}},
 		},
-		&runnerStub{complete: func(mutation mutator.Mutator) {
+		&runnerStub{complete: func(mutation mutator.Mutant) {
 			if mutation.Status() == mutator.Runnable {
 				if mutation.Type() == mutator.ConditionalsBoundary {
 					mutation.SetStatus(mutator.Killed)
@@ -75,7 +75,7 @@ func TestWorkflowDiscoversExecutesAndAssessesMutations(t *testing.T) {
 		engine.Settings{EnabledMutators: map[mutator.Type]bool{
 			mutator.ConditionalsBoundary: true,
 			mutator.ConditionalsNegation: true,
-		}, Workers: 1},
+		}},
 		engine.WithDirFs(workflowFS),
 		engine.WithProgress(func(outcome resultvalues.Outcome) { progress = append(progress, outcome) }),
 	)

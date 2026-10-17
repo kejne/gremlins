@@ -27,8 +27,8 @@ import (
 )
 
 type ExecutorMock struct {
-	mutant mutator.Mutator
-	outCh  chan<- mutator.Mutator
+	mutant mutator.Mutant
+	outCh  chan<- mutator.Mutant
 }
 
 func (tj *ExecutorMock) Start(w *workerpool.Worker) {
@@ -41,7 +41,7 @@ func (tj *ExecutorMock) Start(w *workerpool.Worker) {
 
 func TestWorker(t *testing.T) {
 	executorQueue := make(chan workerpool.Executor)
-	outCh := make(chan mutator.Mutator)
+	outCh := make(chan mutator.Mutant)
 
 	worker := workerpool.NewWorker(1, "test")
 	worker.Start(executorQueue)
@@ -73,7 +73,7 @@ func TestPool(t *testing.T) {
 		configuration.Set(configuration.UnleashWorkersKey, 1)
 		defer configuration.Reset()
 
-		outCh := make(chan mutator.Mutator)
+		outCh := make(chan mutator.Mutant)
 
 		pool := workerpool.Initialize("test", workerpool.Settings{Workers: 1})
 		pool.Start()

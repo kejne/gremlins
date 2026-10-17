@@ -49,7 +49,7 @@ func TestApplyAndRollback(t *testing.T) {
 			mutType: mutator.ConditionalsBoundary,
 			pkg:     "example.com",
 		}
-		outCh := make(chan mutator.Mutator)
+		outCh := make(chan mutator.Mutant)
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 		executor := mjd.newExecutor(mut, outCh, &wg)
@@ -90,7 +90,7 @@ func TestApplyAndRollback(t *testing.T) {
 			pkg:           "example.com",
 			hasApplyError: true,
 		}
-		outCh := make(chan mutator.Mutator)
+		outCh := make(chan mutator.Mutant)
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 		executor := mjd.newExecutor(mut, outCh, &wg)
@@ -171,7 +171,7 @@ func TestMutatorTestExecution(t *testing.T) {
 				mutType: mutator.ConditionalsBoundary,
 				pkg:     "example.com",
 			}
-			outCh := make(chan mutator.Mutator)
+			outCh := make(chan mutator.Mutant)
 			wg := sync.WaitGroup{}
 			wg.Add(1)
 			executor := mjd.newExecutor(mut, outCh, &wg)
@@ -180,7 +180,7 @@ func TestMutatorTestExecution(t *testing.T) {
 				ID:   1,
 			}
 
-			var got mutator.Mutator
+			var got mutator.Mutant
 			mutex := sync.RWMutex{}
 			go func() {
 				mutex.Lock()
@@ -288,7 +288,7 @@ func TestMutatorRun(t *testing.T) {
 				mutType: mutator.ConditionalsBoundary,
 				pkg:     tc.pkg,
 			}
-			outCh := make(chan mutator.Mutator)
+			outCh := make(chan mutator.Mutant)
 			wg := sync.WaitGroup{}
 			wg.Add(1)
 			executor := mjd.newExecutor(mut, outCh, &wg)
@@ -377,7 +377,7 @@ func TestCPU(t *testing.T) {
 				mutType: mutator.ConditionalsBoundary,
 				pkg:     "test",
 			}
-			outCh := make(chan mutator.Mutator)
+			outCh := make(chan mutator.Mutant)
 			wg := sync.WaitGroup{}
 			wg.Add(1)
 			executor := mjd.newExecutor(mut, outCh, &wg)
@@ -458,7 +458,7 @@ func TestMutatorRunInTheCorrectFolder(t *testing.T) {
 			mutType: mutator.ConditionalsBoundary,
 			pkg:     "example.com/my/package",
 		}
-		outCh := make(chan mutator.Mutator)
+		outCh := make(chan mutator.Mutant)
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 		executor := mjd.newExecutor(mut, outCh, &wg)
@@ -504,7 +504,7 @@ func TestMutatorRunInTheCorrectFolder(t *testing.T) {
 			mutType: mutator.ConditionalsBoundary,
 			pkg:     "example.com/my/package",
 		}
-		outCh := make(chan mutator.Mutator)
+		outCh := make(chan mutator.Mutant)
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 		executor := mjd.newExecutor(mut, outCh, &wg)
