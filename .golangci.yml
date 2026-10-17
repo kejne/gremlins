@@ -29,6 +29,7 @@ linters:
     - predeclared
     - revive
     - staticcheck
+    - testpackage
     - tagliatelle
     - unconvert
     - usestdlibvars
@@ -37,7 +38,42 @@ linters:
       - path: '_test\.go'
         linters:
           - goconst
+      # These temporary allowances each cover a pre-existing same-package test.
+      # Remove them as their tests migrate; no allowance applies outside its named file.
+      # CLI unit tests exercise flag wiring and command behavior before CLI boundaries are separated.
+      - path: '^cmd/gremlins_test\.go$'
+        linters: [testpackage]
+      # CLI unleash tests currently share private command setup and fixture helpers.
+      - path: '^cmd/unleash_test\.go$'
+        linters: [testpackage]
+      # Flag parser tests use same-package declarations while the command package is being modularized.
+      - path: '^cmd/internal/flags/flags_test\.go$'
+        linters: [testpackage]
+      # Configuration tests cover unexported configuration parsing and defaults.
+      - path: '^internal/configuration/configuration_test\.go$'
+        linters: [testpackage]
+      # Rule tests exercise private exclusion-rule construction details.
+      - path: '^internal/exclusion/rules_test\.go$'
+        linters: [testpackage]
+      # Cancellation tests use package-private execution lifecycle fixtures.
+      - path: '^internal/execution/cancellation_test\.go$'
+        linters: [testpackage]
+      # Executor tests currently share internal execution setup.
+      - path: '^internal/execution/executor_test\.go$'
+        linters: [testpackage]
+      # Shared executor test helpers are package-private and stay with the existing tests.
+      - path: '^internal/execution/executor_test_helpers_test\.go$'
+        linters: [testpackage]
+      # Result value tests currently construct package-private result values.
+      - path: '^internal/results/results_test\.go$'
+        linters: [testpackage]
   settings:
+    testpackage:
+      # Match no normal filename; an empty value restores the default exemptions.
+      skip-regexp: '^$'
+      # Explicitly replace the default package exemption (main) with no real package.
+      allow-packages:
+        - '__no_package_is_allowed__'
     revive:
       severity: warning
       confidence: 0.8

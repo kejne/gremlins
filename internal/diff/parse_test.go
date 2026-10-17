@@ -1,129 +1,155 @@
-package diff
+package diff_test
 
 import (
 	"errors"
+	"go/token"
 	"reflect"
+	"strings"
 	"testing"
 
-	"github.com/spf13/viper"
-
-	"github.com/kejne/gremlins/internal/configuration"
+	"github.com/kejne/gremlins/internal/diff"
 )
 
 func TestNewWithCmd(t *testing.T) {
-	t.Run("must return nil on empty flag", func(t *testing.T) {
-		m := &mock{}
+	t.Run("empty reference returns nil without running command", func(t *testing.T) {
+		result := &commandResult{}
 
-		d, err := NewWithCmd(m.call, configuration.Get[string](configuration.UnleashDiffRef))
+		got, err := diff.NewWithCmd(commandFor(result), "")
 
-		if d != nil && err != nil {
-			t.Fatal("incorrect result")
+		if err != nil || got != nil {
+			t.Fatalf("NewWithCmd() = (%v, %v), want (nil, nil)", got, err)
+		}
+		if result.calls != 0 {
+			t.Errorf("command called %d times, want 0", result.calls)
 		}
 	})
 
-	t.Run("must return error", func(t *testing.T) {
-		viper.Set(configuration.UnleashDiffRef, "test")
+	t.Run("parses changed ranges across files and ignores deletions", func(t *testing.T) {
+		result := &commandResult{output: []byte(`diff --git a/one.go b/one.go
+--- a/one.go
++++ b/one.go
+@@ -1,3 +1,4 @@
+ first
++inserted
+ second
+ third
+diff --git a/two.go b/two.go
+--- a/two.go
++++ b/two.go
+@@ -7,2 +7,1 @@
+-old
+ remaining
+`)}
 
-		m := &mock{
-			outputErr: errors.New("test"),
+		got, err := diff.NewWithCmd(commandFor(result), "base-ref")
+		if err != nil {
+			t.Fatalf("NewWithCmd() error = %v", err)
 		}
 
-		_, err := NewWithCmd(m.call, configuration.Get[string](configuration.UnleashDiffRef))
-		if err == nil {
-			t.Error("must return error")
+		for _, test := range []struct {
+			name string
+			pos  token.Position
+			want bool
+		}{
+			{name: "inserted line selected", pos: token.Position{Filename: "one.go", Line: 2}, want: true},
+			{name: "neighboring unchanged line excluded", pos: token.Position{Filename: "one.go", Line: 3}, want: false},
+			{name: "deletion does not select remaining line", pos: token.Position{Filename: "two.go", Line: 7}, want: false},
+			{name: "missing file excluded", pos: token.Position{Filename: "missing.go", Line: 2}, want: false},
+		} {
+			t.Run(test.name, func(t *testing.T) {
+				if changed := got.IsChanged(test.pos); changed != test.want {
+					t.Errorf("IsChanged(%+v) = %v, want %v", test.pos, changed, test.want)
+				}
+			})
 		}
 
-		if m.calls != 1 {
-			t.Fatal("cmd not called")
-		}
-
-		expectedArgs := []string{"diff", "--merge-base", "test"}
-
-		if m.callName != "git" || !reflect.DeepEqual(m.callArgs, expectedArgs) {
-			t.Log("name", m.callName)
-			t.Log("args", m.callArgs)
-			t.Error("cmd not called properly")
+		if result.calls != 1 || result.name != "git" || !reflect.DeepEqual(result.args, []string{"diff", "--merge-base", "base-ref"}) {
+			t.Errorf("command invocation = (%q, %v), calls %d; want git diff --merge-base base-ref once", result.name, result.args, result.calls)
 		}
 	})
 
-	t.Run("must return diff error", func(t *testing.T) {
-		viper.Set(configuration.UnleashDiffRef, "test")
+	t.Run("selects each separated changed range and excludes the gap", func(t *testing.T) {
+		result := &commandResult{output: []byte(`diff --git a/one.go b/one.go
+--- a/one.go
++++ b/one.go
+@@ -1,2 +1,2 @@
+-old first
++new first
+ context
+@@ -10,2 +10,2 @@
+-old last
++new last
+ context
+`)}
 
-		m := &mock{
-			output: []byte(testErrDiff),
+		got, err := diff.NewWithCmd(commandFor(result), "base-ref")
+		if err != nil {
+			t.Fatalf("NewWithCmd() error = %v", err)
 		}
-
-		_, err := NewWithCmd(m.call, configuration.Get[string](configuration.UnleashDiffRef))
-		if err == nil {
-			t.Error("must return error")
+		for _, test := range []struct {
+			name string
+			line int
+			want bool
+		}{
+			{name: "first changed range", line: 1, want: true},
+			{name: "unchanged gap", line: 5, want: false},
+			{name: "second changed range", line: 10, want: true},
+		} {
+			t.Run(test.name, func(t *testing.T) {
+				if changed := got.IsChanged(token.Position{Filename: "one.go", Line: test.line}); changed != test.want {
+					t.Errorf("IsChanged(one.go:%d) = %v, want %v", test.line, changed, test.want)
+				}
+			})
 		}
 	})
 
-	t.Run("must return changes", func(t *testing.T) {
-		viper.Set(configuration.UnleashDiffRef, "test")
+	t.Run("command failure includes command output and error", func(t *testing.T) {
+		commandErr := errors.New("git failed")
+		result := &commandResult{output: []byte("diagnostic"), err: commandErr}
 
-		m := &mock{
-			output: []byte(testDiff),
+		_, err := diff.NewWithCmd(commandFor(result), "base-ref")
+		if !errors.Is(err, commandErr) {
+			t.Fatalf("NewWithCmd() error = %v, want wrapped command error", err)
 		}
-
-		expected := Diff{
-			"test/test": {{StartLine: 44, EndLine: 44}},
+		if got := err.Error(); !strings.Contains(got, "diagnostic") {
+			t.Errorf("error %q does not include command output", got)
 		}
+	})
 
-		result, err := NewWithCmd(m.call, configuration.Get[string](configuration.UnleashDiffRef))
+	t.Run("malformed diff returns an error", func(t *testing.T) {
+		result := &commandResult{output: []byte(`diff --git a/one.go b/one.go
+--- a/one.go
++++ b/one.go
+@@ -1,7 +1,7 @@
+ context
++inserted
+ context
+`)}
 
-		if err != nil || !reflect.DeepEqual(result, expected) {
-			t.Log("err", err)
-			t.Log("result", result)
-			t.Error("unexpected result")
+		if _, err := diff.NewWithCmd(commandFor(result), "base-ref"); err == nil {
+			t.Fatal("NewWithCmd() error = nil, want parse error")
 		}
 	})
 }
 
-type mock struct {
-	calls     int
-	callName  string
-	callArgs  []string
-	output    []byte
-	outputErr error
+type commandResult struct {
+	output []byte
+	err    error
+	calls  int
+	name   string
+	args   []string
 }
 
-func (m *mock) call(name string, args ...string) execCmd {
-	m.calls++
-	m.callName = name
-	m.callArgs = args
-
-	return m
+func (r *commandResult) CombinedOutput() ([]byte, error) {
+	return r.output, r.err
 }
 
-func (m *mock) CombinedOutput() ([]byte, error) {
-	return m.output, m.outputErr
-}
+func commandFor(result *commandResult) func(string, ...string) *commandResult {
+	return func(name string, args ...string) *commandResult {
+		result.calls++
+		result.name = name
+		result.args = append([]string(nil), args...)
 
-const (
-	testDiff = `
-diff --git a/test/test b/test/test
-index 54051bc..b92c425 100644
---- a/test/test
-+++ b/test/test
-@@ -41,6 +41,7 @@ const (
- 	test = "test"
- 	test = "test"
- 	test = "test"
-+	test = "test"
- 	test = "test"
- 	test = "test"
- )
-`
-	testErrDiff = `
-diff --git a/test/test b/test/test
-index 54051bc..b92c425 100644
---- a/test/test
-+++ b/test/test
-@@ -41,7 +41,7 @@ const (
- 	test = "test"
-+	test = "test"
- 	test = "test"
- )
-`
-)
+		return result
+	}
+}
