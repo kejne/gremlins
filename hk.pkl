@@ -34,7 +34,7 @@ local checks = new Mapping<String, Step> {
 
 local prePushChecks = checks + new Mapping<String, Step> {
     ["gremlins-diff"] {
-        check = "go run ./cmd/gremlins unleash --diff origin/main --silent"
+        check = "git fetch origin main && go run ./cmd/gremlins unleash --diff origin/main --silent"
         depends = "go-test-and-coverage"
     }
 }
