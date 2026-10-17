@@ -78,15 +78,15 @@ rm "$fixture/internal/fixture/internal_test.go"
 (cd "$fixture" && golangci-lint run ./internal/fixture)
 
 # A file's testpackage allowance must not suppress diagnostics from another linter.
-sed '/^package diff$/a import "fmt"' "$fixture/internal/diff/diff_test.go" >"$temp_root/diff_test.go"
-mv "$temp_root/diff_test.go" "$fixture/internal/diff/diff_test.go"
-cat >>"$fixture/internal/diff/diff_test.go" <<'EOF'
+sed '/^package exclusion$/a import "fmt"' "$fixture/internal/exclusion/rules_test.go" >"$temp_root/rules_test.go"
+mv "$temp_root/rules_test.go" "$fixture/internal/exclusion/rules_test.go"
+cat >>"$fixture/internal/exclusion/rules_test.go" <<'EOF'
 
 func lintDiagnostic() {
 	fmt.Printf("%d", "not a number")
 }
 EOF
-if (cd "$fixture" && golangci-lint run --enable-only govet ./internal/diff) >"$temp_root/unrelated-linter.log" 2>&1; then
+if (cd "$fixture" && golangci-lint run --enable-only govet ./internal/exclusion) >"$temp_root/unrelated-linter.log" 2>&1; then
     echo "testpackage allowance suppressed or missed the injected govet diagnostic" >&2
     exit 1
 fi
@@ -97,14 +97,9 @@ if ! grep -q 'Printf' "$temp_root/unrelated-linter.log"; then
 fi
 
 # Removing a single baseline entry restores enforcement for that exact file.
-mkdir -p "$fixture/internal/diff"
-cp "$project_root/internal/diff/diff.go" "$fixture/internal/diff/"
-cp "$project_root/internal/diff/parse.go" "$fixture/internal/diff/"
-cp "$project_root/internal/diff/diff_test.go" "$fixture/internal/diff/"
-cp "$project_root/internal/diff/parse_test.go" "$fixture/internal/diff/"
-sed '/diff_test/,+1d' "$fixture/.golangci.yml" >"$fixture/.golangci-without-diff-allowance.yml"
-if (cd "$fixture" && golangci-lint run --config .golangci-without-diff-allowance.yml ./internal/diff) >"$temp_root/removed-allowance.log" 2>&1; then
-    echo "testpackage accepted internal/diff/diff_test.go after its allowance was removed" >&2
+sed '/rules_test/,+1d' "$fixture/.golangci.yml" >"$fixture/.golangci-without-rules-allowance.yml"
+if (cd "$fixture" && golangci-lint run --config .golangci-without-rules-allowance.yml ./internal/exclusion) >"$temp_root/removed-allowance.log" 2>&1; then
+    echo "testpackage accepted internal/exclusion/rules_test.go after its allowance was removed" >&2
     exit 1
 fi
 if ! grep -q 'testpackage' "$temp_root/removed-allowance.log"; then
@@ -113,4 +108,4 @@ if ! grep -q 'testpackage' "$temp_root/removed-allowance.log"; then
     exit 1
 fi
 
-echo "testpackage regression demonstrations passed: implicit exemption disabled, external package accepted, and removing one exact allowance restores enforcement."
+echo "testpackage regression demonstrations passed: implicit exemption disabled, external package accepted, unrelated diagnostics visible under an allowance, and removing one exact allowance restores enforcement."
